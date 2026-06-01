@@ -1,0 +1,18 @@
+# .NET build outputs
+backend/bin/
+backend/obj/
+
+# Angular build output
+frontend/dist/
+frontend/.angular/
+
+# Node modules
+frontend/node_modules/
+
+# Environment / secrets
+*.env
+appsettings.Local.json
+
+# OS artefacts
+.DS_Store
+Thumbs.db
