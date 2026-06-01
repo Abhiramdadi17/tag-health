@@ -1,0 +1,366 @@
+<div class="rounded-lg border" [ngStyle]="headerStyle()">
+
+  <!-- ── Sticky wrapper: title bar + zone filters ──────────────────── -->
+  <div [ngStyle]="stickyTitleStyle()">
+
+    <!-- Row 1: title + primary filters -->
+    <div class="px-4 pt-2 pb-2 flex items-center gap-3 rounded-t-lg"
+         [style.background]="C().BG_PANEL">
+
+      <!-- Title + subtitle -->
+      <div class="flex-shrink-0 min-w-0">
+        <h3 class="font-semibold text-base tracking-wider" [ngStyle]="titleStyle()">TAG MONITOR</h3>
+        <p class="text-sm mt-0.5 whitespace-nowrap" [style.color]="C().MUTED">
+          {{ totalCount().toLocaleString() }} rows · {{ batchCount().toLocaleString() }} batches
+          · <span [style.color]="C().TEXT">{{ sortKey() }}</span> {{ sortDir() === 'asc' ? '↑' : '↓' }}
+        </p>
+      </div>
+
+      <div class="flex-1"></div>
+
+      <!-- Data only -->
+      <label [ngStyle]="dataOnlyStyle()">
+        <input type="checkbox" class="w-3 h-3"
+               [checked]="onlyDataAvailable()"
+               (change)="dataAvailableChange.emit($any($event.target).checked)" />
+        <span>Data only</span>
+        <span style="font-size:11px;opacity:0.5;font-weight:normal">({{ dataAvailableCount() }})</span>
+      </label>
+
+      <!-- Zone dropdown -->
+      <div class="flex flex-col gap-0.5 flex-shrink-0" *ngIf="zoneOptions().length > 0">
+        <span class="text-[11px] font-bold tracking-widest uppercase" [style.color]="C().MUTED">Zone</span>
+        <select [ngStyle]="dropdownStyle()"
+                [ngModel]="selectedZone()"
+                (ngModelChange)="zoneChange.emit($event)">
+          <option value="ALL">All zones</option>
+          <option *ngFor="let z of zoneOptions()" [value]="z.key">
+            {{ z.label }} ({{ z.count }})
+          </option>
+        </select>
+      </div>
+
+      <!-- Status dropdown -->
+      <div class="flex flex-col gap-0.5 flex-shrink-0" *ngIf="statusOptions().length > 0">
+        <span class="text-[11px] font-bold tracking-widest uppercase" [style.color]="C().MUTED">Status</span>
+        <select [ngStyle]="dropdownStyle()"
+                [ngModel]="selectedStatus()"
+                (ngModelChange)="statusChange.emit($event)">
+          <option value="ALL">All statuses</option>
+          <option *ngFor="let s of statusOptions()" [value]="s.key">
+            {{ s.label }} ({{ s.count }})
+          </option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- Row 2: date range -->
+    <div class="px-4 pb-2 border-b flex items-center gap-2"
+         [style.border-color]="C().BORDER" [style.background]="C().BG_PANEL">
+      <span class="text-[11px] font-bold tracking-widest uppercase flex-shrink-0" [style.color]="C().MUTED">Date</span>
+      <input type="date" [ngStyle]="dateInputStyle()"
+             [ngModel]="dateFrom()"
+             (ngModelChange)="dateFromChange.emit($event)" />
+      <span class="text-xs flex-shrink-0" [style.color]="C().MUTED">→</span>
+      <input type="date" [ngStyle]="dateInputStyle()"
+             [ngModel]="dateTo()"
+             (ngModelChange)="dateToChange.emit($event)" />
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button type="button" [ngStyle]="presetStyle('today')" (click)="applyPreset.emit('today')">TODAY</button>
+        <button type="button" [ngStyle]="presetStyle('24h')"   (click)="applyPreset.emit('24h')">24H</button>
+        <button type="button" [ngStyle]="presetStyle('7d')"    (click)="applyPreset.emit('7d')">7D</button>
+        <button type="button" [ngStyle]="presetStyle('30d')"   (click)="applyPreset.emit('30d')">30D</button>
+        <button type="button" [ngStyle]="presetStyle('all')"   (click)="applyPreset.emit('all')">ALL</button>
+        <button type="button" [ngStyle]="presetStyle('')"      (click)="clearDate.emit()"
+                *ngIf="dateFrom() || dateTo()">✕</button>
+      </div>
+      <span *ngIf="dateHint()" class="text-xs font-mono flex-shrink-0" [style.color]="C().MUTED">{{ dateHint() }}</span>
+    </div><!-- /row 2 -->
+
+    <!-- ── Zone column filters ────────────────────────────────────── -->
+    <div *ngIf="anyZoneVisible()" class="border-b" [style.border-color]="C().BORDER"
+         [style.background]="C().BG_PANEL">
+
+      <!-- Collapsible header -->
+      <div class="px-6 py-1.5 flex items-center justify-between cursor-pointer select-none"
+           [ngStyle]="zoneFilterHeaderStyle()"
+           (click)="zoneFiltersOpenChange.emit(!zoneFiltersOpen())">
+        <div class="flex items-center gap-2">
+          <span class="text-xs" [style.color]="C().MUTED">{{ zoneFiltersOpen() ? '▾' : '▸' }}</span>
+          <span class="text-xs font-bold tracking-widest" [style.color]="C().MUTED">ZONE FILTERS</span>
+          <span *ngIf="activeFilterCount() > 0"
+                class="text-xs font-bold px-1.5 py-0.5 rounded-full"
+                [style.color]="C().CYAN"
+                [style.background]="C().CYAN + '22'">
+            {{ activeFilterCount() }} active
+          </span>
+        </div>
+        <button type="button"
+                *ngIf="activeFilterCount() > 0"
+                (click)="$event.stopPropagation(); resetFilters.emit()"
+                class="text-xs font-bold tracking-wider"
+                [style.color]="C().MUTED"
+                [style.border]="'1px solid ' + C().BORDER"
+                style="background:transparent;padding:4px 10px;border-radius:6px;">
+          RESET ALL
+        </button>
+      </div>
+
+      <!-- Zone cards -->
+      <div *ngIf="zoneFiltersOpen()" class="px-6 pb-3 flex gap-3 flex-wrap">
+
+        <!-- PSM -->
+        <div *ngIf="psmVisible()" [ngStyle]="zoneCardStyle('PSM')" class="p-3">
+          <div class="flex items-center gap-1.5 mb-2">
+            <span class="text-xs font-bold tracking-widest" [ngStyle]="zoneSectionStyle('PSM')">PSM</span>
+            <span class="text-[11px]" [style.color]="C().MUTED">· Personal Soap Maker</span>
+          </div>
+          <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Tag Type</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().psm.subtype"
+                      (ngModelChange)="filterChange.emit({zone:'psm',key:'subtype',value:$event})">
+                <option *ngFor="let v of opts(psmOpts(),'subtype')" [value]="v">{{ subtypeLabel(v) }}</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Plant</span>
+                <select [ngStyle]="dropdownStyle()"
+                        [ngModel]="zoneFilters().psm.plant"
+                        (ngModelChange)="filterChange.emit({zone:'psm',key:'plant',value:$event})">
+                  <option *ngFor="let v of opts(psmOpts(),'plant')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+                </select>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Recipe</span>
+                <select [ngStyle]="dropdownStyle()"
+                        [ngModel]="zoneFilters().psm.recipe"
+                        (ngModelChange)="filterChange.emit({zone:'psm',key:'recipe',value:$event})">
+                  <option *ngFor="let v of opts(psmOpts(),'recipe')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+                </select>
+              </div>
+              <div class="flex flex-col gap-0.5 col-span-2">
+                <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Raw Material</span>
+                <select [ngStyle]="dropdownStyle()"
+                        [ngModel]="zoneFilters().psm.rm"
+                        (ngModelChange)="filterChange.emit({zone:'psm',key:'rm',value:$event})">
+                  <option *ngFor="let v of opts(psmOpts(),'rm')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIGMA -->
+        <div *ngIf="sigmaVisible()" [ngStyle]="zoneCardStyle('SIGMA')" class="p-3">
+          <div class="flex items-center gap-1.5 mb-2">
+            <span class="text-xs font-bold tracking-widest" [ngStyle]="zoneSectionStyle('SIGMA')">SIGMA</span>
+            <span class="text-[11px]" [style.color]="C().MUTED">· Mixer 1 &amp; Mixer 2</span>
+          </div>
+          <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Tag Type</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().sigma.subtype"
+                      (ngModelChange)="filterChange.emit({zone:'sigma',key:'subtype',value:$event})">
+                <option *ngFor="let v of opts(sigmaOpts(),'subtype')" [value]="v">{{ subtypeLabel(v) }}</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-x-3">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Mixer</span>
+                <select [ngStyle]="dropdownStyle()"
+                        [ngModel]="zoneFilters().sigma.mixer"
+                        (ngModelChange)="filterChange.emit({zone:'sigma',key:'mixer',value:$event})">
+                  <option *ngFor="let v of opts(sigmaOpts(),'mixer')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+                </select>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Recipe</span>
+                <select [ngStyle]="dropdownStyle()"
+                        [ngModel]="zoneFilters().sigma.recipe"
+                        (ngModelChange)="filterChange.emit({zone:'sigma',key:'recipe',value:$event})">
+                  <option *ngFor="let v of opts(sigmaOpts(),'recipe')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SILO -->
+        <div *ngIf="siloVisible()" [ngStyle]="zoneCardStyle('SILO')" class="p-3">
+          <div class="flex items-center gap-1.5 mb-2.5">
+            <span class="text-xs font-bold tracking-widest" [ngStyle]="zoneSectionStyle('SILO')">SILO</span>
+            <span class="text-[11px]" [style.color]="C().MUTED">· Day Silos &amp; Buffer Silos</span>
+          </div>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Tag Type</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().silo.subtype"
+                      (ngModelChange)="filterChange.emit({zone:'silo',key:'subtype',value:$event})">
+                <option *ngFor="let v of opts(siloOpts(),'subtype')" [value]="v">{{ subtypeLabel(v) }}</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Station</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().silo.station"
+                      (ngModelChange)="filterChange.emit({zone:'silo',key:'station',value:$event})">
+                <option *ngFor="let v of opts(siloOpts(),'station')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-0.5 col-span-2">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Noodle</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().silo.noodle"
+                      (ngModelChange)="filterChange.emit({zone:'silo',key:'noodle',value:$event})">
+                <option *ngFor="let v of opts(siloOpts(),'noodle')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- PACKAGING -->
+        <div *ngIf="pkgVisible()" [ngStyle]="zoneCardStyle('PACKAGING')" class="p-3">
+          <div class="flex items-center gap-1.5 mb-2.5">
+            <span class="text-xs font-bold tracking-widest" [ngStyle]="zoneSectionStyle('PACKAGING')">PACKAGING</span>
+            <span class="text-[11px]" [style.color]="C().MUTED">· Wrapping machines (WRA/ACMA)</span>
+          </div>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-2">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Cascade</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().packaging.cascade"
+                      (ngModelChange)="filterChange.emit({zone:'packaging',key:'cascade',value:$event})">
+                <option *ngFor="let v of opts(packagingOpts(),'cascade')" [value]="v">{{ v === 'ALL' ? 'All' : v }}</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-[11px] font-semibold uppercase tracking-wider" [ngStyle]="filterLabelStyle()">Tag Type</span>
+              <select [ngStyle]="dropdownStyle()"
+                      [ngModel]="zoneFilters().packaging.wrapper"
+                      (ngModelChange)="filterChange.emit({zone:'packaging',key:'wrapper',value:$event})">
+                <option *ngFor="let v of opts(packagingOpts(),'wrapper')" [value]="v">{{ subtypeLabel(v) }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /zone cards -->
+    </div><!-- /zone filter panel -->
+
+  </div><!-- /sticky wrapper -->
+
+  <!-- ── Table ──────────────────────────────────────────────────────── -->
+  <table class="w-full text-sm min-w-[900px]">
+
+    <!-- Column headers -->
+    <thead [ngStyle]="stickyTheadStyle()">
+      <tr class="border-b" [ngStyle]="headRowStyle()">
+        <th *ngFor="let col of columns"
+            class="py-2 px-3 font-semibold text-xs tracking-wider text-left"
+            [ngStyle]="thStyle(col.key)"
+            (click)="toggleSort(col.key)">
+          {{ col.label }}{{ arrowFor(col.key) }}
+        </th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let r of sortedRows()"
+          class="border-b cursor-pointer"
+          [style.border-color]="C().BORDER"
+          (click)="rowClick.emit(r)"
+          (mouseenter)="rowMouseEnter($event)"
+          (mouseleave)="rowMouseLeave($event)">
+
+        <!-- ZONE -->
+        <td class="py-1.5 px-3">
+          <span class="text-xs px-1.5 py-0.5 rounded border font-bold" [ngStyle]="zoneStyle(r.zone)">
+            {{ r.zone }}
+          </span>
+        </td>
+
+        <!-- TAG -->
+        <td class="py-1.5 px-3 font-mono text-xs font-medium" [style.color]="C().TEXT">
+          {{ r.shortTag }}
+        </td>
+
+        <!-- MACHINE -->
+        <td class="py-1.5 px-3 font-mono text-xs" [style.color]="C().MUTED">
+          {{ r.machineId }}
+        </td>
+
+        <!-- BATCH -->
+        <td class="py-1.5 px-3 text-xs" [style.color]="C().MUTED">
+          {{ r.batchId ?? '—' }}
+        </td>
+
+        <!-- RECIPE -->
+        <td class="py-1.5 px-3 font-mono text-xs" [style.color]="C().MUTED">
+          {{ r.recipe ?? '—' }}
+        </td>
+
+        <!-- RM / NOODLE -->
+        <td class="py-1.5 px-3 text-xs" [style.color]="C().MUTED">
+          {{ r.rm ?? '—' }}
+        </td>
+
+        <!-- STATUS -->
+        <td class="py-1.5 px-3">
+          <span class="text-xs px-1.5 py-0.5 rounded border font-bold" [ngStyle]="statusStyle(r.status, r.bucket)">
+            {{ r.status }}
+          </span>
+        </td>
+
+        <!-- SP -->
+        <td class="py-1.5 px-3 text-right font-mono text-xs" [style.color]="C().MUTED">
+          <ng-container *ngIf="r.sp != null">{{ formatNum(r.sp, 2) }}</ng-container>
+          <span *ngIf="r.sp == null">—</span>
+        </td>
+
+        <!-- PV -->
+        <td class="py-1.5 px-3 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+          <ng-container *ngIf="r.pv != null">{{ formatNum(r.pv, 2) }}</ng-container>
+          <span *ngIf="r.pv == null">—</span>
+        </td>
+
+        <!-- DEV % -->
+        <td class="py-1.5 px-3 text-right font-bold text-xs" [style.color]="devColor(r.dev)">
+          <ng-container *ngIf="r.dev != null">{{ r.dev > 0 ? '+' : '' }}{{ r.dev.toFixed(2) }}%</ng-container>
+          <span *ngIf="r.dev == null">—</span>
+        </td>
+
+        <!-- BATCH HEALTH -->
+        <td class="py-1.5 px-3">
+          <ng-container *ngIf="healthFor(r) as h">
+            <span class="text-xs px-1.5 py-0.5 rounded border font-bold" [ngStyle]="healthStyle(h.score)"
+                  [title]="h.passing + '/' + h.total + ' rows passing'">
+              {{ h.score.toFixed(0) }}%
+            </span>
+            <span class="text-xs ml-1" [style.color]="C().MUTED">{{ h.passing }}/{{ h.total }}</span>
+          </ng-container>
+          <span *ngIf="!healthFor(r)" [style.color]="C().MUTED">—</span>
+        </td>
+
+        <!-- LATEST VALUE -->
+        <td class="py-1.5 px-3 font-mono text-xs truncate max-w-md" [style.color]="C().MUTED" [title]="r.latestValue">
+          {{ r.latestValue }}
+        </td>
+
+        <!-- TS -->
+        <td class="py-1.5 px-3 font-mono text-xs whitespace-nowrap" [style.color]="C().MUTED">
+          {{ r.ts }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div *ngIf="rows().length === 0" class="text-center py-12 text-sm" [style.color]="C().MUTED">
+    No rows match the active filters.
+  </div>
+</div>

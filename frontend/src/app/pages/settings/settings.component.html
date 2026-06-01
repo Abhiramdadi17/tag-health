@@ -1,0 +1,118 @@
+<div class="p-6 max-w-2xl">
+  <h1 class="text-3xl font-bold mb-8">Settings</h1>
+
+  <!-- Appearance -->
+  <div class="rounded-lg border border-white/10 bg-white/5 p-4 mb-6">
+    <div class="border-b border-white/10 pb-4 mb-4">
+      <h3 class="text-base font-semibold">Appearance</h3>
+    </div>
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="font-medium">Color Theme</p>
+        <p class="text-sm text-white/60">Choose between dark and light modes</p>
+      </div>
+      <div class="flex gap-2">
+        <button (click)="toggleTheme()"
+                class="h-8 px-3 text-sm rounded-lg flex items-center gap-2 font-medium transition"
+                [ngClass]="theme() === 'dark' ? 'bg-blue-600 text-white' : 'border border-white/20'">
+          <lucide-angular [img]="MoonIcon" [size]="16"></lucide-angular>
+          Dark
+        </button>
+        <button (click)="toggleTheme()"
+                class="h-8 px-3 text-sm rounded-lg flex items-center gap-2 font-medium transition"
+                [ngClass]="theme() === 'light' ? 'bg-blue-600 text-white' : 'border border-white/20'">
+          <lucide-angular [img]="SunIcon" [size]="16"></lucide-angular>
+          Light
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data & Updates -->
+  <div class="rounded-lg border border-white/10 bg-white/5 p-4 mb-6">
+    <div class="border-b border-white/10 pb-4 mb-4">
+      <h3 class="text-base font-semibold">Data & Updates</h3>
+    </div>
+    <div class="space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-medium">Auto-Refresh</p>
+          <p class="text-sm text-white/60">Automatically refresh data from server</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" class="sr-only peer"
+                 [checked]="autoRefresh()"
+                 (change)="setAutoRefresh($any($event.target).checked)" />
+          <div class="w-11 h-6 bg-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-medium">Update Frequency</p>
+          <p class="text-sm text-white/60">How often to poll for new data</p>
+        </div>
+        <select class="bg-surface border border-white/10 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-cyan"
+                [ngModel]="updateFrequency()"
+                (ngModelChange)="setUpdateFrequency($event)">
+          <option [ngValue]="5">5 seconds</option>
+          <option [ngValue]="10">10 seconds</option>
+          <option [ngValue]="15">15 seconds</option>
+          <option [ngValue]="30">30 seconds</option>
+          <option [ngValue]="60">1 minute</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Display Options -->
+  <div class="rounded-lg border border-white/10 bg-white/5 p-4 mb-6">
+    <div class="border-b border-white/10 pb-4 mb-4">
+      <h3 class="text-base font-semibold">Display Options</h3>
+    </div>
+    <div class="space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-medium">Chart Type</p>
+          <p class="text-sm text-white/60">Visualization library for charts</p>
+        </div>
+        <select class="bg-surface border border-white/10 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-cyan"
+                [ngModel]="chartType()"
+                (ngModelChange)="setChartType($event)">
+          <option value="recharts">Recharts</option>
+          <option value="plotly">Plotly</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="font-medium">Advanced Metrics</p>
+          <p class="text-sm text-white/60">Show additional analysis metrics</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" class="sr-only peer"
+                 [checked]="showAdvancedMetrics()"
+                 (change)="setShowAdvancedMetrics($any($event.target).checked)" />
+          <div class="w-11 h-6 bg-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-cyan rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent-cyan"></div>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- System -->
+  <div class="rounded-lg border border-white/10 bg-white/5 p-4">
+    <div class="border-b border-white/10 pb-4 mb-4">
+      <h3 class="text-base font-semibold">System</h3>
+    </div>
+    <div class="space-y-4">
+      <button class="w-full h-10 px-4 text-base flex items-center justify-center gap-2 border border-white/20 rounded-lg transition hover:bg-white/5"
+              (click)="resetDefaults()">
+        <lucide-angular [img]="ResetIcon" [size]="16"></lucide-angular>
+        Reset to Defaults
+      </button>
+      <p class="text-xs text-white/40 text-center">
+        All settings are automatically saved to your browser
+      </p>
+    </div>
+  </div>
+</div>

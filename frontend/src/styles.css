@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon-green:  #00ff88;
+  --neon-cyan:   #00e5ff;
+  --neon-pink:   #ff2d78;
+  --neon-orange: #ff6a00;
+  --neon-yellow: #ffe600;
+  --neon-purple: #bf5fff;
+
+  --bg-base:   #080d18;
+  --bg-panel:  #0d1526;
+  --bg-card:   #111c33;
+  --border:    #1e2d4a;
+}
+
+html { scroll-behavior: smooth; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background-color: var(--bg-base);
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.neon-green  { color: var(--neon-green);  text-shadow: 0 0 8px var(--neon-green); }
+.neon-cyan   { color: var(--neon-cyan);   text-shadow: 0 0 8px var(--neon-cyan); }
+.neon-pink   { color: var(--neon-pink);   text-shadow: 0 0 8px var(--neon-pink); }
+.neon-orange { color: var(--neon-orange); text-shadow: 0 0 8px var(--neon-orange); }
+.neon-yellow { color: var(--neon-yellow); text-shadow: 0 0 8px var(--neon-yellow); }
+.neon-purple { color: var(--neon-purple); text-shadow: 0 0 8px var(--neon-purple); }
+
+.glow-green  { box-shadow: 0 0 10px rgba(0,255,136,0.4),  0 0 2px rgba(0,255,136,0.8); }
+.glow-yellow { box-shadow: 0 0 10px rgba(255,230,0,0.4),  0 0 2px rgba(255,230,0,0.8); }
+.glow-orange { box-shadow: 0 0 10px rgba(255,106,0,0.4),  0 0 2px rgba(255,106,0,0.8); }
+.glow-pink   { box-shadow: 0 0 10px rgba(255,45,120,0.4), 0 0 2px rgba(255,45,120,0.8); }
+.glow-cyan   { box-shadow: 0 0 10px rgba(0,229,255,0.35), 0 0 2px rgba(0,229,255,0.7); }
+
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #00e5ff44; }
+
+input, select, textarea {
+  background-color: var(--bg-panel) !important;
+  color: #e2e8f0 !important;
+  border-color: var(--border) !important;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 0 2px rgba(0,229,255,0.2) !important;
+}
+input::placeholder { color: #475569 !important; }
+
+option { background-color: var(--bg-panel); color: #e2e8f0; }
+
+button:active { transform: scale(0.97); }
+
+/* Tag detail drawer slide-in animation */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in {
+  animation: slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+* {
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 120ms;
+}

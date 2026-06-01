@@ -1,0 +1,427 @@
+<ng-container *ngIf="row() as r">
+
+  <!-- ── Overlay backdrop ───────────────────────────────────────────────── -->
+  <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+       (click)="closed.emit()"></div>
+
+  <!-- ── Drawer panel ───────────────────────────────────────────────────── -->
+  <div class="fixed top-0 right-0 h-full w-[420px] z-50 flex flex-col shadow-2xl
+              animate-slide-in overflow-hidden"
+       [style.background]="C().BG_PANEL"
+       [style.border-left]="'1px solid ' + C().BORDER">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <div class="px-5 py-4 border-b flex items-start justify-between gap-3"
+         [style.border-color]="C().BORDER"
+         [style.background]="C().BG_BASE">
+      <div class="min-w-0">
+        <!-- Zone + Status badges -->
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <span class="text-[11px] px-2 py-0.5 rounded border font-bold tracking-wider"
+                [style.color]="zoneColor()"
+                [style.border-color]="zoneColor() + '55'"
+                [style.background]="zoneColor() + '18'"
+                [style.box-shadow]="C().isDark ? ('0 0 8px ' + zoneColor() + '44') : 'none'">
+            {{ r.zone }}
+          </span>
+          <span class="text-[11px] px-2 py-0.5 rounded border font-bold tracking-wider"
+                [style.color]="statusColor()"
+                [style.border-color]="statusColor() + '55'"
+                [style.background]="statusColor() + '18'"
+                [style.box-shadow]="C().isDark ? ('0 0 8px ' + statusColor() + '44') : 'none'">
+            {{ r.status }}
+          </span>
+        </div>
+        <!-- Tag name -->
+        <div class="font-mono font-bold text-base leading-tight truncate"
+             [style.color]="C().TEXT" [title]="r.tag">
+          {{ r.shortTag }}
+        </div>
+        <!-- Meta line -->
+        <div class="text-[11px] mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5"
+             [style.color]="C().MUTED">
+          <span *ngIf="r.machineId">Machine: <span [style.color]="C().TEXT">{{ r.machineId }}</span></span>
+          <span *ngIf="r.recipe">Recipe: <span [style.color]="C().TEXT">{{ r.recipe }}</span></span>
+          <span *ngIf="r.batchId">Batch: <span [style.color]="C().TEXT">{{ r.batchId }}</span></span>
+          <span *ngIf="r.rm">RM: <span [style.color]="C().TEXT">{{ r.rm }}</span></span>
+        </div>
+        <div class="text-[10px] mt-1" [style.color]="C().MUTED">{{ r.ts }}</div>
+      </div>
+      <!-- Close button -->
+      <button type="button"
+              class="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-lg font-bold
+                     transition-colors hover:opacity-80"
+              [style.color]="C().MUTED"
+              [style.background]="C().BG_CARD"
+              [style.border]="'1px solid ' + C().BORDER"
+              (click)="closed.emit()">✕</button>
+    </div>
+
+    <!-- ── Scrollable body ────────────────────────────────────────────── -->
+    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+      <!-- ── 1. Batch Health Donut ──────────────────────────────────── -->
+      <div class="rounded-xl border p-4"
+           [style.border-color]="C().BORDER"
+           [style.background]="C().BG_CARD">
+
+        <div class="text-[11px] font-bold tracking-widest mb-3" [style.color]="C().CYAN">
+          BATCH HEALTH
+        </div>
+
+        <ng-container *ngIf="health() as h; else noHealth">
+          <div class="flex items-center gap-5">
+            <!-- SVG Donut -->
+            <svg [attr.width]="CX*2" [attr.height]="CY*2" class="flex-shrink-0">
+              <!-- Track ring -->
+              <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="RADIUS"
+                      fill="none"
+                      [attr.stroke]="C().BORDER"
+                      [attr.stroke-width]="STROKE" />
+              <!-- Progress ring -->
+              <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="RADIUS"
+                      fill="none"
+                      [attr.stroke]="donutColor()"
+                      [attr.stroke-width]="STROKE"
+                      stroke-linecap="round"
+                      [attr.stroke-dasharray]="circumference"
+                      [attr.stroke-dashoffset]="donutOffset()"
+                      transform="rotate(-90, 64, 64)"
+                      style="transition: stroke-dashoffset 0.6s ease, stroke 0.4s ease" />
+              <!-- Glow ring (dark theme only) -->
+              <circle *ngIf="C().isDark"
+                      [attr.cx]="CX" [attr.cy]="CY" [attr.r]="RADIUS"
+                      fill="none"
+                      [attr.stroke]="donutColor()"
+                      stroke-width="2"
+                      stroke-opacity="0.3"
+                      [attr.stroke-dasharray]="circumference"
+                      [attr.stroke-dashoffset]="donutOffset()"
+                      transform="rotate(-90, 64, 64)"
+                      style="filter:blur(3px)" />
+              <!-- Centre label -->
+              <text [attr.x]="CX" [attr.y]="CY - 7"
+                    text-anchor="middle" dominant-baseline="middle"
+                    font-size="18" font-weight="bold"
+                    [attr.fill]="donutColor()">
+                {{ h.score.toFixed(0) }}%
+              </text>
+              <text [attr.x]="CX" [attr.y]="CY + 12"
+                    text-anchor="middle" dominant-baseline="middle"
+                    font-size="10"
+                    [attr.fill]="C().MUTED">
+                HEALTH
+              </text>
+            </svg>
+
+            <!-- Stats -->
+            <div class="space-y-3 flex-1">
+              <div>
+                <div class="text-[10px] uppercase tracking-wider mb-1" [style.color]="C().MUTED">Passing</div>
+                <div class="text-2xl font-bold" [style.color]="C().GREEN">{{ h.passing }}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-wider mb-1" [style.color]="C().MUTED">Failing</div>
+                <div class="text-2xl font-bold" [style.color]="C().PINK">{{ h.total - h.passing }}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-wider mb-1" [style.color]="C().MUTED">Total tags</div>
+                <div class="text-xl font-semibold" [style.color]="C().TEXT">{{ h.total }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Passing bar -->
+          <div class="mt-4">
+            <div class="flex justify-between text-[10px] mb-1" [style.color]="C().MUTED">
+              <span>0%</span><span>50%</span><span>100%</span>
+            </div>
+            <div class="h-2 rounded-full overflow-hidden" [style.background]="C().BORDER">
+              <div class="h-full rounded-full transition-all duration-700"
+                   [style.width]="h.score + '%'"
+                   [style.background]="donutColor()"
+                   [style.box-shadow]="C().isDark ? ('0 0 8px ' + donutColor() + '88') : 'none'">
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-template #noHealth>
+          <div class="text-sm py-4 text-center" [style.color]="C().MUTED">No health data for this batch.</div>
+        </ng-template>
+      </div>
+
+      <!-- ── 2. Deviation Gauge ─────────────────────────────────────── -->
+      <div *ngIf="r.dataAvailable" class="rounded-xl border p-4"
+           [style.border-color]="C().BORDER"
+           [style.background]="C().BG_CARD">
+
+        <div class="text-[11px] font-bold tracking-widest mb-3" [style.color]="C().CYAN">
+          DEVIATION  ·  SP vs PV
+        </div>
+
+        <!-- SP / PV row -->
+        <div class="flex gap-4 mb-4">
+          <div class="flex-1 rounded-lg p-3 text-center"
+               [style.background]="C().BG_BASE"
+               [style.border]="'1px solid ' + C().BORDER">
+            <div class="text-[10px] tracking-wider mb-1" [style.color]="C().MUTED">SETPOINT (SP)</div>
+            <div class="font-mono text-xl font-bold" [style.color]="C().TEXT">
+              {{ formatNum(r.sp) }}
+            </div>
+          </div>
+          <div class="flex-1 rounded-lg p-3 text-center"
+               [style.background]="C().BG_BASE"
+               [style.border]="'1px solid ' + C().BORDER">
+            <div class="text-[10px] tracking-wider mb-1" [style.color]="C().MUTED">PROCESS (PV)</div>
+            <div class="font-mono text-xl font-bold" [style.color]="devColor()">
+              {{ formatNum(r.pv) }}
+            </div>
+          </div>
+          <div class="flex-1 rounded-lg p-3 text-center"
+               [style.background]="C().BG_BASE"
+               [style.border]="'1px solid ' + C().BORDER">
+            <div class="text-[10px] tracking-wider mb-1" [style.color]="C().MUTED">DEVIATION</div>
+            <div class="font-mono text-xl font-bold" [style.color]="devColor()">
+              {{ devLabel() }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Gauge track -->
+        <div class="space-y-1">
+          <div class="relative h-5 rounded-full overflow-visible">
+            <!-- Coloured zones: green centre, yellow shoulders, red edges -->
+            <div class="absolute inset-0 rounded-full overflow-hidden flex">
+              <div class="h-full" style="width:20%;background:rgba(239,68,68,0.4)"></div>
+              <div class="h-full" style="width:10%;background:rgba(234,179,8,0.4)"></div>
+              <div class="h-full" style="width:40%;background:rgba(34,197,94,0.25)"></div>
+              <div class="h-full" style="width:10%;background:rgba(234,179,8,0.4)"></div>
+              <div class="h-full" style="width:20%;background:rgba(239,68,68,0.4)"></div>
+            </div>
+            <!-- Centre line -->
+            <div class="absolute top-0 bottom-0 w-px"
+                 style="left:50%"
+                 [style.background]="C().BORDER + 'cc'"></div>
+            <!-- Marker -->
+            <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 shadow-md z-10"
+                 style="transition: left 0.5s ease"
+                 [style.left]="'calc(' + devMarkerPct() + '% - 6px)'"
+                 [style.background]="devColor()"
+                 [style.border-color]="C().BG_CARD"
+                 [style.box-shadow]="C().isDark ? ('0 0 8px ' + devColor()) : ''">
+            </div>
+          </div>
+          <div class="flex justify-between text-[10px]" [style.color]="C().MUTED">
+            <span>−{{ DEV_RANGE }}%</span>
+            <span>±5%</span>
+            <span>0</span>
+            <span>±5%</span>
+            <span>+{{ DEV_RANGE }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 3. Historical PV/SP Chart ────────────────────────────────── -->
+      <div class="rounded-xl border p-4"
+           [style.border-color]="C().BORDER"
+           [style.background]="C().BG_CARD">
+
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-[11px] font-bold tracking-widest" [style.color]="C().CYAN">
+            HISTORICAL VALUES
+          </span>
+          <span class="text-[10px]" [style.color]="C().MUTED">
+            {{ historyPoints().length }} readings
+            <ng-container *ngIf="r.zone === 'PSM'"> · last 10</ng-container>
+          </span>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex items-center gap-4 mb-3 text-[10px]" [style.color]="C().MUTED">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block w-5 h-0.5 rounded" [style.background]="C().CYAN"></span>
+            PV (actual)
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block w-5 h-0 border-t-2 border-dashed" [style.border-color]="C().MUTED + 'aa'"></span>
+            SP (setpoint)
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full inline-block" [style.background]="C().GREEN"></span>
+            ≤5%
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full inline-block" [style.background]="C().YELLOW"></span>
+            ≤10%
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full inline-block" [style.background]="C().PINK"></span>
+            >10%
+          </span>
+        </div>
+
+        <!-- SVG Chart -->
+        <ng-container *ngIf="chartMeta() as cm; else noChart">
+          <svg [attr.width]="CHART_W" [attr.height]="CHART_H"
+               class="w-full overflow-visible"
+               [attr.viewBox]="'0 0 ' + CHART_W + ' ' + CHART_H">
+
+            <!-- Y-axis ticks + grid lines -->
+            <ng-container *ngFor="let tick of cm.yTicks">
+              <line [attr.x1]="PAD.l" [attr.y1]="tick.y"
+                    [attr.x2]="CHART_W - PAD.r" [attr.y2]="tick.y"
+                    stroke-dasharray="3 3"
+                    [attr.stroke]="C().BORDER" stroke-width="1" />
+              <text [attr.x]="PAD.l - 4" [attr.y]="tick.y"
+                    text-anchor="end" dominant-baseline="middle"
+                    font-size="9" [attr.fill]="C().MUTED">
+                {{ formatTick(tick.val) }}
+              </text>
+            </ng-container>
+
+            <!-- SP dashed line -->
+            <polyline *ngIf="cm.spPoints"
+                      [attr.points]="cm.spPoints"
+                      fill="none"
+                      [attr.stroke]="C().MUTED"
+                      stroke-width="1.5"
+                      stroke-dasharray="4 3"
+                      stroke-opacity="0.7" />
+
+            <!-- PV area fill (subtle gradient) -->
+            <defs>
+              <linearGradient id="pvGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" [attr.stop-color]="C().CYAN" stop-opacity="0.18"/>
+                <stop offset="100%" [attr.stop-color]="C().CYAN" stop-opacity="0.01"/>
+              </linearGradient>
+            </defs>
+
+            <!-- PV line -->
+            <polyline [attr.points]="cm.pvPoints"
+                      fill="none"
+                      [attr.stroke]="C().CYAN"
+                      stroke-width="2"
+                      stroke-linejoin="round"
+                      stroke-linecap="round" />
+
+            <!-- PV glow line (dark only) -->
+            <polyline *ngIf="C().isDark"
+                      [attr.points]="cm.pvPoints"
+                      fill="none"
+                      [attr.stroke]="C().CYAN"
+                      stroke-width="5"
+                      stroke-opacity="0.15"
+                      stroke-linejoin="round"
+                      stroke-linecap="round" />
+
+            <!-- Data dots (coloured by deviation) -->
+            <ng-container *ngFor="let dot of cm.dots">
+              <!-- outer halo -->
+              <circle *ngIf="C().isDark"
+                      [attr.cx]="dot.x" [attr.cy]="dot.y" r="5"
+                      [attr.fill]="dotColor(dot.dev)" fill-opacity="0.2" />
+              <!-- dot -->
+              <circle [attr.cx]="dot.x" [attr.cy]="dot.y" r="3"
+                      [attr.fill]="dotColor(dot.dev)"
+                      [attr.stroke]="C().BG_CARD" stroke-width="1.5">
+                <title>{{ dot.ts }}  PV={{ formatNum(dot.pv) }}{{ dot.sp != null ? ('  SP=' + formatNum(dot.sp)) : '' }}{{ dot.dev != null ? ('  Dev=' + (dot.dev > 0 ? '+' : '') + dot.dev.toFixed(2) + '%') : '' }}</title>
+              </circle>
+            </ng-container>
+
+            <!-- X axis line -->
+            <line [attr.x1]="PAD.l" [attr.y1]="CHART_H - PAD.b"
+                  [attr.x2]="CHART_W - PAD.r" [attr.y2]="CHART_H - PAD.b"
+                  [attr.stroke]="C().BORDER" stroke-width="1" />
+          </svg>
+
+          <!-- X-axis labels: first, mid, last timestamp -->
+          <div class="flex justify-between text-[9px] mt-1 px-1" [style.color]="C().MUTED">
+            <span>{{ cm.dots[0].ts }}</span>
+            <span *ngIf="cm.dots.length > 2">{{ cm.dots[midIndex(cm.dots.length)].ts }}</span>
+            <span>{{ cm.dots[cm.dots.length - 1].ts }}</span>
+          </div>
+        </ng-container>
+
+        <ng-template #noChart>
+          <div class="text-sm py-4 text-center" [style.color]="C().MUTED">
+            No historical readings available.
+          </div>
+        </ng-template>
+      </div>
+
+      <!-- ── 4. Tags in this batch ──────────────────────────────────── -->
+      <div class="rounded-xl border overflow-hidden"
+           [style.border-color]="C().BORDER"
+           [style.background]="C().BG_CARD">
+
+        <div class="px-4 py-3 border-b flex items-center justify-between"
+             [style.border-color]="C().BORDER"
+             [style.background]="C().BG_BASE">
+          <span class="text-[11px] font-bold tracking-widest" [style.color]="C().CYAN">
+            TAGS IN THIS BATCH
+          </span>
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded"
+                [style.color]="C().MUTED"
+                [style.background]="C().BORDER + '55'">
+            {{ batchRows().length }} tags
+          </span>
+        </div>
+
+        <div *ngIf="batchRows().length === 0"
+             class="py-6 text-center text-sm" [style.color]="C().MUTED">
+          No rich tags found in this batch.
+        </div>
+
+        <div *ngFor="let t of batchRows(); let odd = odd"
+             class="px-4 py-2.5 flex items-center gap-3"
+             [style.background]="odd ? (C().BORDER + '22') : 'transparent'"
+             [class.opacity-60]="t.id === r.id">
+
+          <!-- Status dot -->
+          <span class="w-2 h-2 rounded-full flex-shrink-0"
+                [style.background]="bucketColor(t.bucket)"
+                [style.box-shadow]="C().isDark ? ('0 0 5px ' + bucketColor(t.bucket)) : 'none'">
+          </span>
+
+          <!-- Tag name (highlight selected) -->
+          <span class="font-mono text-xs flex-1 truncate"
+                [style.color]="t.id === r.id ? C().TEXT : C().MUTED"
+                [style.font-weight]="t.id === r.id ? '700' : '400'"
+                [title]="t.tag">
+            {{ t.shortTag }}
+          </span>
+
+          <!-- SP/PV micro display -->
+          <span class="text-[10px] tabular-nums" [style.color]="C().MUTED">
+            <ng-container *ngIf="t.sp != null">{{ formatNum(t.sp) }} → {{ formatNum(t.pv) }}</ng-container>
+          </span>
+
+          <!-- Dev mini-bar -->
+          <div class="w-16 flex-shrink-0">
+            <div class="relative h-1.5 rounded-full overflow-visible" [style.background]="C().BORDER">
+              <!-- zero marker -->
+              <div class="absolute top-0 bottom-0 w-px" style="left:50%"
+                   [style.background]="C().MUTED + '66'"></div>
+              <!-- fill from centre -->
+              <div class="absolute top-0 h-full rounded-full"
+                   [style.background]="siblingDevColor(t.dev)"
+                   [style.left]="siblingBarLeft(t.dev)"
+                   [style.width]="siblingBarWidth(t.dev)">
+              </div>
+            </div>
+          </div>
+
+          <!-- Dev label -->
+          <span class="text-[11px] font-bold tabular-nums w-14 text-right flex-shrink-0"
+                [style.color]="siblingDevColor(t.dev)">
+            <ng-container *ngIf="t.dev != null">{{ t.dev > 0 ? '+' : '' }}{{ t.dev.toFixed(1) }}%</ng-container>
+            <span *ngIf="t.dev == null">—</span>
+          </span>
+        </div>
+      </div>
+
+    </div><!-- /scroll body -->
+  </div><!-- /drawer panel -->
+
+</ng-container>

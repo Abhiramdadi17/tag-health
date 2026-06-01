@@ -1,0 +1,72 @@
+<div class="rounded-lg border" [ngStyle]="headerStyle()">
+  <!-- Header -->
+  <div class="p-4 border-b flex items-center justify-between" [style.border-color]="C().BORDER">
+    <div>
+      <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
+        TAG HEALTH MONITOR
+      </h3>
+      <p class="text-xs mt-0.5" [style.color]="C().MUTED">
+        {{ tags().length.toLocaleString() }} tags
+      </p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <span *ngFor="let entry of statusCounts()"
+            class="px-2 py-0.5 rounded text-xs font-bold border"
+            [ngStyle]="getStatusStyle(entry[0])">
+        {{ entry[0] }} {{ entry[1] }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b" [ngStyle]="headRowStyle()">
+          <th *ngFor="let h of columns; let i = index"
+              class="py-3 px-4 font-semibold text-xs tracking-wider"
+              [ngClass]="thAlign(i)"
+              [style.color]="C().CYAN">
+            {{ h }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let tag of tags()"
+            class="border-b cursor-pointer"
+            [style.border-color]="C().BORDER"
+            (mouseenter)="rowMouseEnter($event)"
+            (mouseleave)="rowMouseLeave($event)"
+            (click)="onTagClick(tag)">
+          <td class="py-3 px-4 font-mono text-xs font-medium truncate max-w-xs"
+              [style.color]="C().TEXT">
+            {{ tag.synthetic_id }}
+          </td>
+          <td class="py-3 px-4" [style.color]="C().MUTED">{{ tag.plant }}</td>
+          <td class="py-3 px-4" [style.color]="C().MUTED">{{ tag.recipe }}</td>
+          <td class="py-3 px-4" [style.color]="C().MUTED">{{ tag.raw_material }}</td>
+          <td class="py-3 px-4 text-center" [style.color]="C().MUTED">{{ tag.batch_id }}</td>
+          <td class="py-3 px-4 text-center" [style.color]="C().MUTED">{{ tag.shift }}</td>
+          <td class="py-3 px-4 text-right font-bold"
+              [style.color]="getDevColor(tag.current_deviation_pct)">
+            {{ tag.current_deviation_pct > 0 ? '+' : '' }}{{ tag.current_deviation_pct.toFixed(2) }}%
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+            {{ tag.current_pv.toFixed(3) }} / {{ tag.current_sp.toFixed(3) }}
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="text-xs px-2 py-0.5 rounded border" [ngStyle]="readingsBadgeStyle()">
+              {{ tag.reading_count }}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="text-xs px-2 py-0.5 rounded border font-bold"
+                  [ngStyle]="getStatusStyle(tag.health_status)">
+              {{ tag.health_status }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

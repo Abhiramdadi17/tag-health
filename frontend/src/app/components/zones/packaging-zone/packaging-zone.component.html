@@ -1,0 +1,86 @@
+<ng-container *ngIf="pkg$ | async as snap">
+  <div class="rounded-lg border" [ngStyle]="headerStyle()">
+    <!-- Header -->
+    <div class="p-4 border-b flex items-center justify-between" [style.border-color]="C().BORDER">
+      <div>
+        <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
+          PACKAGING MONITOR
+        </h3>
+        <p class="text-xs mt-0.5" [style.color]="C().MUTED">
+          {{ rows(snap).length }} wrappers · 2 cascades
+        </p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <span *ngFor="let entry of statusCounts(snap)"
+              class="px-2 py-0.5 rounded text-xs font-bold border"
+              [ngStyle]="statusStyle(entry[0])">
+          {{ entry[0] }} {{ entry[1] }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b" [ngStyle]="headRowStyle()">
+            <th *ngFor="let h of columns; let i = index"
+                class="py-3 px-4 font-semibold text-xs tracking-wider"
+                [ngClass]="thAlign(i)"
+                [style.color]="C().CYAN">
+              {{ h }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of rows(snap)"
+              class="border-b"
+              [style.border-color]="C().BORDER"
+              (mouseenter)="rowMouseEnter($event)"
+              (mouseleave)="rowMouseLeave($event)">
+            <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">
+              {{ row.wrapperName }}
+            </td>
+            <td class="py-3 px-4">
+              <span class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="cascadeStyle(row.cascade)">
+                {{ row.cascade }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+              {{ row.currentGrams }}
+            </td>
+            <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.targetGrams }}
+            </td>
+            <td class="py-3 px-4 text-right font-bold" [style.color]="devColor(row.dev)">
+              {{ row.dev > 0 ? '+' : '' }}{{ row.dev }}g
+            </td>
+            <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.machineId }}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <span class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="statusStyle(row.status)">
+                {{ row.status }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Alerts strip -->
+    <div *ngIf="alerts(snap).length > 0"
+         class="p-3 border-t text-xs flex flex-wrap gap-2"
+         [style.border-color]="C().BORDER">
+      <span *ngFor="let a of alerts(snap)"
+            class="px-2 py-0.5 rounded border"
+            [style.color]="severityColor(a)"
+            [style.border-color]="severityColor(a) + '44'"
+            [style.background]="severityColor(a) + '11'">
+        <span class="font-bold">{{ a.ruleId }}</span> · {{ a.message }}
+      </span>
+    </div>
+  </div>
+</ng-container>

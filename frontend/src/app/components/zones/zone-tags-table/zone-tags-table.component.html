@@ -1,0 +1,133 @@
+<div class="rounded-lg border" [ngStyle]="headerStyle()">
+  <div class="p-4 border-b flex items-center justify-between" [style.border-color]="C().BORDER">
+    <div>
+      <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
+        {{ zone() | uppercase }} TELEMETRY
+      </h3>
+      <p class="text-xs mt-0.5" [style.color]="C().MUTED">
+        {{ rows().length.toLocaleString() }} rows · {{ data().length.toLocaleString() }} loaded
+      </p>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b" [ngStyle]="headRowStyle()">
+          <th *ngFor="let h of columns()"
+              class="py-3 px-4 font-semibold text-xs tracking-wider text-left"
+              [style.color]="C().CYAN">
+            {{ h }}
+          </th>
+        </tr>
+      </thead>
+
+      <!-- SIGMA layout -->
+      <tbody *ngIf="zone() === 'sigma'">
+        <tr *ngFor="let r of rows()"
+            class="border-b"
+            [style.border-color]="C().BORDER"
+            (mouseenter)="rowMouseEnter($event)"
+            (mouseleave)="rowMouseLeave($event)">
+          <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">{{ r.tag }}</td>
+          <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">{{ r.machineId }}</td>
+          <td class="py-3 px-4 text-xs" [style.color]="C().MUTED">{{ r.subtype || '—' }}</td>
+          <td class="py-3 px-4">
+            <span *ngIf="r.status" class="text-xs px-2 py-0.5 rounded border font-bold" [ngStyle]="statusStyle(r.status)">
+              {{ r.status }}
+            </span>
+            <span *ngIf="!r.status" class="text-xs" [style.color]="C().MUTED">—</span>
+          </td>
+          <td class="py-3 px-4 text-xs" [style.color]="C().MUTED">{{ r.batch ?? '—' }}</td>
+          <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">{{ r.recipe ?? '—' }}</td>
+          <td class="py-3 px-4 text-xs" [style.color]="C().MUTED">{{ r.rm ?? '—' }}</td>
+          <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+            <ng-container *ngIf="r.sp != null">{{ r.sp.toFixed(3) }}</ng-container>
+            <span *ngIf="r.sp == null">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+            <ng-container *ngIf="r.pv != null">{{ r.pv.toFixed(3) }}</ng-container>
+            <span *ngIf="r.pv == null">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-bold" [style.color]="devColor(r.dev)">
+            <ng-container *ngIf="r.dev != null">{{ r.dev > 0 ? '+' : '' }}{{ r.dev.toFixed(2) }}%</ng-container>
+            <span *ngIf="r.dev == null">—</span>
+          </td>
+          <td class="py-3 px-4 font-mono text-xs truncate max-w-md" [style.color]="C().MUTED" [title]="r.rawValue">
+            {{ r.rawValue }}
+          </td>
+          <td class="py-3 px-4 font-mono text-xs whitespace-nowrap" [style.color]="C().MUTED">{{ r.ts }}</td>
+        </tr>
+      </tbody>
+
+      <!-- SILO layout -->
+      <tbody *ngIf="zone() === 'silo'">
+        <tr *ngFor="let r of rows()"
+            class="border-b"
+            [style.border-color]="C().BORDER"
+            (mouseenter)="rowMouseEnter($event)"
+            (mouseleave)="rowMouseLeave($event)">
+          <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">{{ r.tag }}</td>
+          <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">{{ r.machineId }}</td>
+          <td class="py-3 px-4 text-xs" [style.color]="C().MUTED">{{ r.subtype || '—' }}</td>
+          <td class="py-3 px-4">
+            <span *ngIf="r.status" class="text-xs px-2 py-0.5 rounded border font-bold" [ngStyle]="statusStyle(r.status)">
+              {{ r.status }}
+            </span>
+            <span *ngIf="!r.status" class="text-xs" [style.color]="C().MUTED">—</span>
+          </td>
+          <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">{{ r.batch ?? '—' }}</td>
+          <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+            <ng-container *ngIf="r.sp != null">{{ r.sp.toFixed(2) }}</ng-container>
+            <span *ngIf="r.sp == null">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+            <ng-container *ngIf="r.pv != null">{{ r.pv.toFixed(2) }}</ng-container>
+            <span *ngIf="r.pv == null">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-bold" [style.color]="devColor(r.dev)">
+            <ng-container *ngIf="r.dev != null">{{ r.dev > 0 ? '+' : '' }}{{ r.dev.toFixed(2) }}%</ng-container>
+            <span *ngIf="r.dev == null">—</span>
+          </td>
+          <td class="py-3 px-4 font-mono text-xs truncate max-w-md" [style.color]="C().MUTED" [title]="r.rawValue">
+            {{ r.rawValue }}
+          </td>
+          <td class="py-3 px-4 font-mono text-xs whitespace-nowrap" [style.color]="C().MUTED">{{ r.ts }}</td>
+        </tr>
+      </tbody>
+
+      <!-- PACKAGING layout -->
+      <tbody *ngIf="zone() === 'packaging'">
+        <tr *ngFor="let r of rows()"
+            class="border-b"
+            [style.border-color]="C().BORDER"
+            (mouseenter)="rowMouseEnter($event)"
+            (mouseleave)="rowMouseLeave($event)">
+          <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">{{ r.tag }}</td>
+          <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">{{ r.machineId }}</td>
+          <td class="py-3 px-4 font-mono text-xs font-bold" [style.color]="C().TEXT">{{ r.subtype || '—' }}</td>
+          <td class="py-3 px-4">
+            <span *ngIf="r.cascade" class="text-xs px-2 py-0.5 rounded border font-bold" [ngStyle]="cascadeStyle(r.cascade)">
+              {{ r.cascade }}
+            </span>
+            <span *ngIf="!r.cascade" class="text-xs" [style.color]="C().MUTED">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+            <ng-container *ngIf="r.pv != null">{{ r.pv }}</ng-container>
+            <span *ngIf="r.pv == null">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+            <ng-container *ngIf="r.sp != null">{{ r.sp }}</ng-container>
+            <span *ngIf="r.sp == null">—</span>
+          </td>
+          <td class="py-3 px-4 text-right font-bold" [style.color]="devGramColor(r.dev)">
+            <ng-container *ngIf="r.dev != null">{{ r.dev > 0 ? '+' : '' }}{{ r.dev }}g</ng-container>
+            <span *ngIf="r.dev == null">—</span>
+          </td>
+          <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">{{ r.rawValue }}</td>
+          <td class="py-3 px-4 font-mono text-xs whitespace-nowrap" [style.color]="C().MUTED">{{ r.ts }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

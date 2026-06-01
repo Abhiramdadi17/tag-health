@@ -1,0 +1,266 @@
+<!-- Header -->
+<div class="sticky top-0 p-5 border-b flex items-start justify-between" [ngStyle]="headerStyle()">
+  <div>
+    <div class="flex items-center gap-2 mb-1 text-sm">
+      <span [style.color]="C().MUTED">Plant</span>
+      <span class="font-semibold" [style.color]="C().TEXT">{{ tag().plant }}</span>
+      <span class="ml-2" [style.color]="C().MUTED">Recipe</span>
+      <span class="font-semibold" [style.color]="C().TEXT">{{ tag().recipe }}</span>
+    </div>
+    <div class="flex items-center gap-2 mb-2 text-sm">
+      <span [style.color]="C().MUTED">Material</span>
+      <span class="font-semibold" [style.color]="C().TEXT">{{ tag().raw_material }}</span>
+    </div>
+    <div class="text-xs" [style.color]="C().MUTED">
+      Batch #{{ tag().batch_id }} · Shift {{ tag().shift }}
+    </div>
+    <div class="text-xs font-mono mt-1" [ngStyle]="syntheticIdStyle()">
+      {{ tag().synthetic_id }}
+    </div>
+  </div>
+  <button (click)="onClose()"
+          class="p-1 rounded"
+          [style.color]="C().MUTED"
+          (mouseenter)="setHoverCyan($event)"
+          (mouseleave)="setHoverMuted($event)">
+    <lucide-angular [img]="XIcon" [size]="18"></lucide-angular>
+  </button>
+</div>
+
+<!-- Content -->
+<div class="p-5 space-y-4">
+  <!-- RIGHT NOW -->
+  <div>
+    <p [ngStyle]="sectionTitleStyle()">RIGHT NOW</p>
+    <div class="flex items-center gap-2 mb-3">
+      <div class="w-2.5 h-2.5 rounded-full" [ngStyle]="rightNowDotStyle()"></div>
+      <span class="text-xs font-semibold" [style.color]="statusColor(tag().health_status)">
+        {{ tag().health_status }}
+      </span>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div [ngStyle]="cardStyle()">
+        <p class="text-xs mb-1" [style.color]="C().MUTED">Deviation</p>
+        <p class="text-2xl font-bold" [style.color]="devColor(tag().current_deviation_pct)">
+          {{ tag().current_deviation_pct > 0 ? '+' : '' }}{{ tag().current_deviation_pct.toFixed(2) }}%
+        </p>
+      </div>
+      <div [ngStyle]="cardStyle()">
+        <p class="text-xs mb-1" [style.color]="C().MUTED">PV / SP</p>
+        <p class="text-sm font-mono" [style.color]="C().TEXT">
+          {{ tag().current_pv.toFixed(3) }}<br />
+          <span [style.color]="C().MUTED">/ {{ tag().current_sp.toFixed(3) }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div [ngStyle]="hrStyle()"></div>
+
+  <!-- LAST 10 READINGS -->
+  <div>
+    <p [ngStyle]="sectionTitleStyle()">LAST 10 READINGS</p>
+    <div class="rounded p-3 mb-3"
+         [style.background]="C().BG_CARD"
+         [style.border]="'1px solid ' + C().BORDER">
+      <div class="flex items-end gap-1 h-20">
+        <div *ngFor="let r of readings(); let i = index"
+             class="flex-1 rounded-t"
+             [style.height]="readingBarHeight(r)"
+             [style.background]="readingBarBg(r)"
+             [style.opacity]="0.8"
+             [title]="r.toFixed(2)"></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mb-2">
+      <div [ngStyle]="cardStyle()" class="text-center">
+        <p class="text-xs" [style.color]="C().MUTED">Min</p>
+        <p class="text-sm font-bold" [style.color]="C().TEXT">{{ minVal().toFixed(2) }}</p>
+      </div>
+      <div [ngStyle]="cardStyle()" class="text-center">
+        <p class="text-xs" [style.color]="C().MUTED">Max</p>
+        <p class="text-sm font-bold" [style.color]="C().TEXT">{{ maxVal().toFixed(2) }}</p>
+      </div>
+      <div [ngStyle]="cardStyle()" class="text-center">
+        <p class="text-xs" [style.color]="C().MUTED">Mean</p>
+        <p class="text-sm font-bold" [style.color]="C().TEXT">{{ mean().toFixed(2) }}</p>
+      </div>
+    </div>
+    <p class="text-xs" [style.color]="C().MUTED">
+      Slope {{ slope() > 0 ? '+' : '' }}{{ slope().toFixed(4) }} · Vol {{ volatility().toFixed(4) }}
+    </p>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="!prediction()" class="p-4 rounded border text-center"
+       [style.background]="C().BG_CARD"
+       [style.border-color]="C().BORDER">
+    <p class="text-xs" [style.color]="C().MUTED">Loading prediction...</p>
+  </div>
+
+  <ng-container *ngIf="prediction() as pred">
+    <div [ngStyle]="hrStyle()"></div>
+
+    <!-- FORECAST -->
+    <div>
+      <p [ngStyle]="sectionTitleStyle()">FORECAST</p>
+      <div class="p-4 rounded border" [ngStyle]="forecastBoxStyle()">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+                [ngStyle]="riskPillStyle()">
+            {{ pred.risk_class }} risk
+          </span>
+          <span class="text-xs" [style.color]="C().MUTED">
+            {{ (pred.risk_score * 100).toFixed(1) }}% score
+          </span>
+        </div>
+
+        <div *ngIf="pred.predicted_deviation !== undefined" class="mb-3">
+          <p class="text-xs mb-1" [style.color]="C().MUTED">Expected drift in next interval</p>
+          <p class="text-3xl font-bold" [style.color]="predictedDevColor(pred.predicted_deviation)">
+            {{ pred.predicted_deviation > 0 ? '+' : '' }}{{ pred.predicted_deviation.toFixed(2) }}%
+          </p>
+          <p class="text-xs mt-1" [style.color]="C().MUTED">
+            Range: {{ pred.uncertainty_band.p10.toFixed(2) }}% → {{ pred.uncertainty_band.p90.toFixed(2) }}%
+          </p>
+        </div>
+
+        <p class="text-xs" [style.color]="C().TEXT" [style.opacity]="0.7">
+          {{ getRiskDesc(pred.risk_class) }}
+        </p>
+      </div>
+    </div>
+
+    <!-- SPIKE PROBABILITY -->
+    <div *ngIf="pred.spike_probability">
+      <p [ngStyle]="sectionTitleStyle()">SPIKE PROBABILITY</p>
+
+      <ng-container *ngIf="pred.spike_probability.in_batch != null">
+        <div class="p-3 rounded border mb-3"
+             [style.background]="probabilityColor(pred.spike_probability.in_batch * 100) + '0a'"
+             [style.border-color]="probabilityColor(pred.spike_probability.in_batch * 100) + '44'">
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-xs font-semibold" [style.color]="C().TEXT">Batch spike probability</p>
+            <p class="text-xl font-bold"
+               [style.color]="probabilityColor(pred.spike_probability.in_batch * 100)"
+               [style.text-shadow]="C().isDark ? ('0 0 8px ' + probabilityColor(pred.spike_probability.in_batch * 100) + '88') : 'none'">
+              {{ (pred.spike_probability.in_batch * 100).toFixed(0) }}%
+            </p>
+          </div>
+          <div class="w-full h-1.5 rounded-full mb-2" [style.background]="C().BORDER">
+            <div class="h-full rounded-full"
+                 [style.width]="Math.max(pred.spike_probability.in_batch * 100, 1) + '%'"
+                 [style.background]="probabilityColor(pred.spike_probability.in_batch * 100)"></div>
+          </div>
+          <p class="text-xs" [style.color]="C().MUTED">
+            Probability this tag spikes
+            <span [style.color]="C().TEXT">at some point before this batch ends</span> — not necessarily right now.
+          </p>
+        </div>
+      </ng-container>
+
+      <p class="text-xs font-semibold mb-0.5" [style.color]="C().TEXT">Next 15 minutes</p>
+      <p class="text-xs mb-3" [style.color]="C().MUTED">Is a spike happening right now?</p>
+
+      <div class="space-y-3">
+        <ng-container *ngFor="let win of spikeWindows">
+          <div *ngIf="pred.spike_probability[win] != null">
+            <div class="flex items-center gap-3">
+              <p class="text-xs font-mono w-10" [style.color]="C().MUTED">in {{ win }}</p>
+              <div class="flex-1 rounded-full h-2 overflow-hidden" [style.background]="C().BORDER">
+                <div class="h-full rounded-full"
+                     [ngStyle]="spikeBatchBarStyle(pred.spike_probability[win]! * 100, probabilityColor(pred.spike_probability[win]! * 100))"></div>
+              </div>
+              <p class="text-xs font-bold w-12 text-right"
+                 [style.color]="probabilityColor(pred.spike_probability[win]! * 100)">
+                {{ (pred.spike_probability[win]! * 100).toFixed(1) }}%
+              </p>
+            </div>
+            <p class="text-xs pl-14 mt-0.5" [style.color]="C().MUTED">
+              {{ pred.spike_probability[win]! * 100 > 50 ? 'Spike likely within ' + win : 'No spike expected in next ' + win }}
+            </p>
+          </div>
+        </ng-container>
+      </div>
+
+      <p class="text-xs mt-3 pt-3 border-t" [style.color]="C().MUTED" [style.border-color]="C().BORDER">
+        Est. lead time: ~{{ pred.lead_time_minutes.toFixed(0) }} min{{ leadTimeFootnote() }}
+      </p>
+    </div>
+
+    <div [ngStyle]="hrStyle()"></div>
+
+    <!-- SUMMARY -->
+    <div>
+      <p [ngStyle]="sectionTitleStyle()">SUMMARY</p>
+      <p class="text-xs leading-relaxed" [style.color]="C().TEXT" [style.opacity]="0.75">
+        {{ pred.trajectory_summary }}
+      </p>
+    </div>
+
+    <!-- TOP PRECURSORS -->
+    <div *ngIf="precursors().length > 0">
+      <p [ngStyle]="sectionTitleStyle()">TOP PRECURSORS</p>
+      <div class="space-y-2">
+        <div *ngFor="let p of precursors()"
+             class="p-2 rounded border flex items-center justify-between"
+             [ngStyle]="cardStyle()">
+          <p class="text-xs font-mono" [style.color]="C().MUTED">{{ p.feature }}</p>
+          <div class="flex items-center gap-3">
+            <span *ngIf="p.shap_value !== undefined" class="text-xs" [style.color]="C().MUTED">
+              {{ p.shap_value.toFixed(3) }}
+            </span>
+            <span class="text-sm font-bold" [style.color]="precursorTrendColor(p.trend)">
+              {{ p.trend }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEMPORAL ATTENTION -->
+    <div *ngIf="temporalAttentionEntries().length > 0">
+      <p [ngStyle]="sectionTitleStyle()">TEMPORAL ATTENTION</p>
+      <p class="text-xs mb-3" [style.color]="C().MUTED">Weight of different time windows in prediction</p>
+      <div class="space-y-2">
+        <div *ngFor="let entry of temporalAttentionEntries()" class="flex items-center gap-2">
+          <p class="text-xs w-24" [style.color]="C().MUTED">{{ entry[0] }}</p>
+          <div class="flex-1 rounded-full h-1.5 overflow-hidden" [style.background]="C().BORDER">
+            <div class="h-full rounded-full" [ngStyle]="attentionFillStyle(entry[1])"></div>
+          </div>
+          <p class="text-xs font-bold w-10 text-right" [style.color]="C().CYAN">
+            {{ Math.round(entry[1] * 100) }}%
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div [ngStyle]="hrStyle()"></div>
+
+    <!-- MODEL INFO -->
+    <div>
+      <p [ngStyle]="sectionTitleStyle()">MODEL INFORMATION</p>
+      <div class="space-y-2">
+        <div class="p-2 rounded border flex items-center justify-between" [ngStyle]="cardStyle()">
+          <p class="text-xs" [style.color]="C().MUTED">Confidence</p>
+          <p class="text-sm font-bold" [style.color]="C().GREEN">
+            {{ (pred.confidence * 100).toFixed(1) }}%
+          </p>
+        </div>
+        <div *ngIf="modelVersionEntries().length > 0" class="p-2 rounded border" [ngStyle]="cardStyle()">
+          <p class="text-xs mb-1" [style.color]="C().MUTED">Models Used</p>
+          <p *ngFor="let mv of modelVersionEntries()" class="text-xs font-mono"
+             [style.color]="C().TEXT" [style.opacity]="0.6">
+            <span [style.color]="C().CYAN">{{ mv[0] }}:</span> {{ mv[1] }}
+          </p>
+        </div>
+        <div class="p-2 rounded border" [ngStyle]="cardStyle()">
+          <p class="text-xs mb-1" [style.color]="C().MUTED">Prediction Time</p>
+          <p class="text-xs font-mono" [style.color]="C().TEXT" [style.opacity]="0.6">
+            {{ predictionTimestamp() }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

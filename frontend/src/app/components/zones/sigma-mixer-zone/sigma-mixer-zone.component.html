@@ -1,0 +1,94 @@
+<ng-container *ngIf="sigma$ | async as snap">
+  <div class="rounded-lg border" [ngStyle]="headerStyle()">
+    <!-- Header -->
+    <div class="p-4 border-b flex items-center justify-between" [style.border-color]="C().BORDER">
+      <div>
+        <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
+          SIGMA MIXER MONITOR
+        </h3>
+        <p class="text-xs mt-0.5" [style.color]="C().MUTED">2 mixers · Lauric only</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <span *ngFor="let entry of statusCounts(snap)"
+              class="px-2 py-0.5 rounded text-xs font-bold border"
+              [ngStyle]="statusStyle(entry[0] === 'DOSING' ? 2 : entry[0] === 'COMPLETE' ? 3 : 1)">
+          {{ entry[0] }} {{ entry[1] }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b" [ngStyle]="headRowStyle()">
+            <th *ngFor="let h of columns; let i = index"
+                class="py-3 px-4 font-semibold text-xs tracking-wider"
+                [ngClass]="thAlign(i)"
+                [style.color]="C().CYAN">
+              {{ h }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of rows(snap)"
+              class="border-b"
+              [style.border-color]="C().BORDER"
+              (mouseenter)="rowMouseEnter($event)"
+              (mouseleave)="rowMouseLeave($event)">
+            <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">{{ row.id }}</td>
+            <td class="py-3 px-4 text-center">
+              <span class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="statusStyle(row.mixer.batch?.S)">
+                {{ statusLabel(row.mixer.batch?.S) }}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-center" [style.color]="C().MUTED">
+              {{ row.mixer.batch?.B ?? '—' }}
+            </td>
+            <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.mixer.batch?.R ?? '—' }}
+            </td>
+            <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.mixer.batch ? row.mixer.batch.SP.toFixed(3) : '—' }}
+            </td>
+            <td class="py-3 px-4 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+              {{ row.mixer.batch ? row.mixer.batch.PV.toFixed(3) : '—' }}
+            </td>
+            <td class="py-3 px-4 text-right font-bold" [style.color]="devColor(deviation(row.mixer))">
+              <ng-container *ngIf="deviation(row.mixer) as d; else dashDev">
+                {{ d > 0 ? '+' : '' }}{{ d.toFixed(2) }}%
+              </ng-container>
+              <ng-template #dashDev>—</ng-template>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">
+              {{ barcodeLabel(row.mixer) }}
+            </td>
+            <td class="py-3 px-4">
+              <span class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="reworkStyle(row.mixer)">
+                {{ reworkLabel(row.mixer) }}
+              </span>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.mixer.batch?.D ?? '—' }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Alerts strip -->
+    <div *ngIf="allAlerts(snap).length > 0"
+         class="p-3 border-t text-xs flex flex-wrap gap-2"
+         [style.border-color]="C().BORDER">
+      <span *ngFor="let a of allAlerts(snap)"
+            class="px-2 py-0.5 rounded border"
+            [style.color]="severityColor(a)"
+            [style.border-color]="severityColor(a) + '44'"
+            [style.background]="severityColor(a) + '11'">
+        <span class="font-bold">{{ a.ruleId }}</span> · {{ a.message }}
+      </span>
+    </div>
+  </div>
+</ng-container>

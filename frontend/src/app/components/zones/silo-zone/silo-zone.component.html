@@ -1,0 +1,177 @@
+<ng-container *ngIf="silo$ | async as snap">
+  <!-- Silos table -->
+  <div class="rounded-lg border" [ngStyle]="headerStyle()">
+    <div class="p-4 border-b flex items-center justify-between" [style.border-color]="C().BORDER">
+      <div>
+        <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
+          SILO MONITOR
+        </h3>
+        <p class="text-xs mt-0.5" [style.color]="C().MUTED">
+          6 day silos · 5 buffer silos
+        </p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <span *ngFor="let entry of noodleCounts(snap)"
+              class="px-2 py-0.5 rounded text-xs font-bold border"
+              [ngStyle]="noodleStyle(entry[0])">
+          {{ entry[0] }} {{ entry[1] }}
+        </span>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b" [ngStyle]="headRowStyle()">
+            <th *ngFor="let h of siloColumns; let i = index"
+                class="py-3 px-4 font-semibold text-xs tracking-wider"
+                [ngClass]="siloThAlign(i)"
+                [style.color]="C().CYAN">
+              {{ h }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of siloRows(snap)"
+              class="border-b"
+              [style.border-color]="C().BORDER"
+              (mouseenter)="rowMouseEnter($event)"
+              (mouseleave)="rowMouseLeave($event)">
+            <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">{{ row.id }}</td>
+            <td class="py-3 px-4" [style.color]="C().MUTED">{{ row.group }}</td>
+            <td class="py-3 px-4">
+              <span *ngIf="row.noodleType; else dashType"
+                    class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="noodleStyle(row.noodleType)">
+                {{ row.noodleType }}
+              </span>
+              <ng-template #dashType><span [style.color]="C().MUTED">—</span></ng-template>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.paired ?? '—' }}
+            </td>
+            <td class="py-3 px-4 text-center">
+              <span *ngIf="row.mismatch; else okCheck"
+                    class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [style.color]="C().PINK"
+                    [style.border-color]="C().PINK + '44'"
+                    [style.background]="C().PINK + '11'">
+                MISMATCH
+              </span>
+              <ng-template #okCheck>
+                <span class="text-xs" [style.color]="C().MUTED">—</span>
+              </ng-template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Bag-out stations table -->
+  <div class="rounded-lg border mt-4" [ngStyle]="headerStyle()">
+    <div class="p-4 border-b" [style.border-color]="C().BORDER">
+      <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
+        BAG-OUT STATIONS
+      </h3>
+      <p class="text-xs mt-0.5" [style.color]="C().MUTED">
+        Stn_01 SP=850 kg · Stn_02 SP=900 kg
+      </p>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b" [ngStyle]="headRowStyle()">
+            <th *ngFor="let h of stationColumns; let i = index"
+                class="py-3 px-4 font-semibold text-xs tracking-wider"
+                [ngClass]="stationThAlign(i)"
+                [style.color]="C().CYAN">
+              {{ h }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of stationRows(snap)"
+              class="border-b"
+              [style.border-color]="C().BORDER"
+              (mouseenter)="rowMouseEnter($event)"
+              (mouseleave)="rowMouseLeave($event)">
+            <td class="py-3 px-4 font-mono text-xs font-medium" [style.color]="C().TEXT">{{ row.id }}</td>
+            <td class="py-3 px-4 text-center">
+              <span class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="stationStateStyle(row.state)">
+                {{ row.state }}
+              </span>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.batchId }}
+            </td>
+            <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
+              {{ row.sp != null ? row.sp.toFixed(2) : '—' }}
+            </td>
+            <td class="py-3 px-4 text-right font-mono text-xs font-bold" [style.color]="C().TEXT">
+              {{ row.pv != null ? row.pv.toFixed(2) : '—' }}
+            </td>
+            <td class="py-3 px-4 text-right font-bold" [style.color]="devColor(row.dev)">
+              <ng-container *ngIf="row.dev != null; else dashDev">
+                {{ row.dev > 0 ? '+' : '' }}{{ row.dev.toFixed(2) }}%
+              </ng-container>
+              <ng-template #dashDev>—</ng-template>
+            </td>
+            <td class="py-3 px-4">
+              <span *ngIf="row.noodleType !== '—'; else dashNood"
+                    class="text-xs px-2 py-0.5 rounded border font-bold"
+                    [ngStyle]="noodleStyle(row.noodleType)">
+                {{ row.noodleType }}
+              </span>
+              <ng-template #dashNood>
+                <span class="text-xs" [style.color]="C().MUTED">—</span>
+              </ng-template>
+            </td>
+            <td class="py-3 px-4 font-mono text-xs"
+                [style.color]="row.barcodeIdle ? C().MUTED : C().TEXT">
+              {{ row.barcodeIdle ? 'Waiting for scan…' : row.barcode }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Warehouse + Shreeji footer -->
+    <div class="px-4 py-3 border-t flex flex-wrap items-center gap-x-6 gap-y-2 text-xs"
+         [style.border-color]="C().BORDER">
+      <div *ngIf="warehouse(snap) as wh" class="flex items-center gap-2">
+        <span class="font-semibold tracking-wider" [style.color]="C().CYAN">WAREHOUSE</span>
+        <span [style.color]="C().MUTED">batch</span>
+        <span [style.color]="C().TEXT">{{ wh.batchId }}</span>
+        <span [style.color]="C().MUTED">·</span>
+        <span [style.color]="C().TEXT">{{ wh.weight }} kg</span>
+        <span class="px-2 py-0.5 rounded border font-bold" [ngStyle]="noodleStyle(wh.noodleType)">
+          {{ wh.noodleType }}
+        </span>
+        <span [style.color]="C().MUTED">×{{ wh.count }}</span>
+      </div>
+      <div *ngIf="shreeji(snap) as sh" class="flex items-center gap-2">
+        <span class="font-semibold tracking-wider" [style.color]="C().CYAN">SHREEJI</span>
+        <span [style.color]="C().MUTED">id</span>
+        <span class="font-mono" [style.color]="C().TEXT">{{ sh.barcodeId }}</span>
+        <span [style.color]="C().MUTED">·</span>
+        <span [style.color]="C().TEXT">{{ sh.weight }} kg</span>
+      </div>
+    </div>
+
+    <!-- Alerts strip -->
+    <div *ngIf="alerts(snap).length > 0"
+         class="p-3 border-t text-xs flex flex-wrap gap-2"
+         [style.border-color]="C().BORDER">
+      <span *ngFor="let a of alerts(snap)"
+            class="px-2 py-0.5 rounded border"
+            [style.color]="severityColor(a)"
+            [style.border-color]="severityColor(a) + '44'"
+            [style.background]="severityColor(a) + '11'">
+        <span class="font-bold">{{ a.ruleId }}</span> · {{ a.message }}
+      </span>
+    </div>
+  </div>
+</ng-container>
