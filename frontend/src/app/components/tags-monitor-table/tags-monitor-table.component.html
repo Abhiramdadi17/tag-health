@@ -1,72 +1,129 @@
-<div class="rounded-lg border" [ngStyle]="headerStyle()">
-  <!-- Header -->
-  <div class="p-4 border-b flex items-center justify-between" [style.border-color]="C().BORDER">
-    <div>
-      <h3 class="font-semibold text-sm tracking-wider" [ngStyle]="titleStyle()">
-        TAG HEALTH MONITOR
+<div class="panel" style="border-radius:10px;overflow:hidden;">
+
+  <!-- ── Table Header Bar ─────────────────────────────── -->
+  <div class="px-6 py-3 border-b flex items-center justify-between"
+       [style.background]="C().BG_PANEL"
+       [style.border-color]="C().BORDER">
+
+    <div class="flex items-center gap-4">
+      <!-- Heading -->
+      <h3 class="font-heading" style="font-size:15px;color:inherit;"
+          [style.color]="C().TEXT">
+        Tag Health Monitor
       </h3>
-      <p class="text-xs mt-0.5" [style.color]="C().MUTED">
+      <!-- Row count -->
+      <span class="metric-readout" style="font-size:12px;" [style.color]="C().MUTED">
         {{ tags().length.toLocaleString() }} tags
-      </p>
+      </span>
     </div>
+
+    <!-- Status summary chips -->
     <div class="flex gap-2 flex-wrap">
       <span *ngFor="let entry of statusCounts()"
-            class="px-2 py-0.5 rounded text-xs font-bold border"
-            [ngStyle]="getStatusStyle(entry[0])">
-        {{ entry[0] }} {{ entry[1] }}
+            class="chip-status"
+            [ngClass]="getStatusClass(entry[0])">
+        {{ entry[0] }}
+        <span class="ml-1 font-mono-val" style="font-size:10px;">{{ entry[1] }}</span>
       </span>
     </div>
   </div>
 
-  <!-- Table -->
+  <!-- ── Table ─────────────────────────────────────────── -->
   <div class="overflow-x-auto">
-    <table class="w-full text-sm">
+    <table class="w-full" style="border-collapse:collapse;">
+
+      <!-- Column Headers -->
       <thead>
-        <tr class="border-b" [ngStyle]="headRowStyle()">
-          <th *ngFor="let h of columns; let i = index"
-              class="py-3 px-4 font-semibold text-xs tracking-wider"
-              [ngClass]="thAlign(i)"
-              [style.color]="C().CYAN">
-            {{ h }}
-          </th>
+        <tr class="tbl-header-row">
+          <th class="tbl-header-cell" style="width:80px;text-align:center;">ZONE</th>
+          <th class="tbl-header-cell" style="text-align:left;">TAG / ENTITY</th>
+          <th class="tbl-header-cell" style="text-align:left;">PLANT</th>
+          <th class="tbl-header-cell" style="text-align:left;">RECIPE</th>
+          <th class="tbl-header-cell" style="text-align:left;">MATERIAL</th>
+          <th class="tbl-header-cell" style="text-align:center;">BATCH</th>
+          <th class="tbl-header-cell" style="text-align:center;">SHIFT</th>
+          <th class="tbl-header-cell" style="text-align:right;">DEV%</th>
+          <th class="tbl-header-cell" style="text-align:right;">PV&thinsp;/&thinsp;SP</th>
+          <th class="tbl-header-cell" style="text-align:center;">READS</th>
+          <th class="tbl-header-cell" style="text-align:center;">STATUS</th>
         </tr>
       </thead>
+
       <tbody>
-        <tr *ngFor="let tag of tags()"
-            class="border-b cursor-pointer"
-            [style.border-color]="C().BORDER"
+        <tr *ngFor="let tag of tags(); let i = index"
+            class="tbl-row"
+            [style.background]="i % 2 === 1 ? C().BG_ROW_ALT : C().BG_PANEL"
             (mouseenter)="rowMouseEnter($event)"
-            (mouseleave)="rowMouseLeave($event)"
+            (mouseleave)="rowMouseLeave($event, i)"
             (click)="onTagClick(tag)">
-          <td class="py-3 px-4 font-mono text-xs font-medium truncate max-w-xs"
-              [style.color]="C().TEXT">
-            {{ tag.synthetic_id }}
+
+          <!-- ZONE badge -->
+          <td class="tbl-cell tbl-cell-zone">
+            <span class="badge-zone" [ngClass]="getZoneClass(tag.plant)">
+              {{ getZoneLabel(tag.plant) }}
+            </span>
           </td>
-          <td class="py-3 px-4" [style.color]="C().MUTED">{{ tag.plant }}</td>
-          <td class="py-3 px-4" [style.color]="C().MUTED">{{ tag.recipe }}</td>
-          <td class="py-3 px-4" [style.color]="C().MUTED">{{ tag.raw_material }}</td>
-          <td class="py-3 px-4 text-center" [style.color]="C().MUTED">{{ tag.batch_id }}</td>
-          <td class="py-3 px-4 text-center" [style.color]="C().MUTED">{{ tag.shift }}</td>
-          <td class="py-3 px-4 text-right font-bold"
-              [style.color]="getDevColor(tag.current_deviation_pct)">
-            {{ tag.current_deviation_pct > 0 ? '+' : '' }}{{ tag.current_deviation_pct.toFixed(2) }}%
+
+          <!-- TAG ID -->
+          <td class="tbl-cell" style="padding:0 16px;">
+            <span class="tbl-cell-tag" style="display:block;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                  [style.color]="C().TEXT">
+              {{ tag.synthetic_id }}
+            </span>
           </td>
-          <td class="py-3 px-4 text-right font-mono text-xs" [style.color]="C().MUTED">
-            {{ tag.current_pv.toFixed(3) }} / {{ tag.current_sp.toFixed(3) }}
+
+          <!-- PLANT -->
+          <td class="tbl-cell" [style.color]="C().MUTED">{{ tag.plant }}</td>
+
+          <!-- RECIPE -->
+          <td class="tbl-cell" [style.color]="C().MUTED">{{ tag.recipe }}</td>
+
+          <!-- MATERIAL -->
+          <td class="tbl-cell" [style.color]="C().MUTED">{{ tag.raw_material }}</td>
+
+          <!-- BATCH -->
+          <td class="tbl-cell" style="text-align:center;">
+            <span class="metric-readout" style="font-size:12px;" [style.color]="C().MUTED">
+              {{ tag.batch_id }}
+            </span>
           </td>
-          <td class="py-3 px-4 text-center">
-            <span class="text-xs px-2 py-0.5 rounded border" [ngStyle]="readingsBadgeStyle()">
+
+          <!-- SHIFT -->
+          <td class="tbl-cell" style="text-align:center;" [style.color]="C().MUTED">{{ tag.shift }}</td>
+
+          <!-- DEV% -->
+          <td class="tbl-cell" style="text-align:right;padding:0 16px;">
+            <span class="dev-pill" [ngClass]="getDevClass(tag.current_deviation_pct)">
+              {{ tag.current_deviation_pct > 0 ? '+' : '' }}{{ tag.current_deviation_pct.toFixed(2) }}%
+            </span>
+          </td>
+
+          <!-- PV / SP -->
+          <td class="tbl-cell" style="text-align:right;padding:0 16px;">
+            <span class="font-mono-val" style="font-size:12px;" [style.color]="C().TEXT">
+              {{ tag.current_pv.toFixed(3) }}
+            </span>
+            <span class="metric-readout" style="color:#9CA3AF;"> / {{ tag.current_sp.toFixed(3) }}</span>
+          </td>
+
+          <!-- READINGS -->
+          <td class="tbl-cell" style="text-align:center;">
+            <span class="metric-readout" style="font-size:12px;background:#F3F4F6;border-radius:4px;padding:2px 8px;"
+                  [style.color]="C().MUTED">
               {{ tag.reading_count }}
             </span>
           </td>
-          <td class="py-3 px-4 text-center">
-            <span class="text-xs px-2 py-0.5 rounded border font-bold"
-                  [ngStyle]="getStatusStyle(tag.health_status)">
+
+          <!-- STATUS chip -->
+          <td class="tbl-cell" style="text-align:center;">
+            <span class="chip-status" [ngClass]="getStatusClass(tag.health_status)">
               {{ tag.health_status }}
             </span>
           </td>
+
         </tr>
       </tbody>
     </table>
   </div>
+
 </div>

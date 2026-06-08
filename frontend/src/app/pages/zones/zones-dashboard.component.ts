@@ -301,9 +301,9 @@ export class ZonesDashboardComponent implements OnInit {
     const active = this.isZoneOn(zone);
     return {
       color: active ? col : c.MUTED,
-      borderColor: active ? `${col}88` : c.BORDER,
-      background: active ? `${col}15` : 'transparent',
-      boxShadow: active && c.isDark ? `0 0 8px ${col}33` : 'none',
+      borderColor: active ? `color-mix(in srgb, ${col} 53%, transparent)` : c.BORDER,
+      background: active ? `color-mix(in srgb, ${col} 8%, transparent)` : 'transparent',
+      boxShadow: active && c.isDark ? `0 0 8px color-mix(in srgb, ${col} 20%, transparent)` : 'none',
     };
   }
 
@@ -313,9 +313,9 @@ export class ZonesDashboardComponent implements OnInit {
     const active = this.isStatusOn(status);
     return {
       color: active ? col : c.MUTED,
-      borderColor: active ? `${col}88` : c.BORDER,
-      background: active ? `${col}15` : 'transparent',
-      boxShadow: active && c.isDark ? `0 0 8px ${col}33` : 'none',
+      borderColor: active ? `color-mix(in srgb, ${col} 53%, transparent)` : c.BORDER,
+      background: active ? `color-mix(in srgb, ${col} 8%, transparent)` : 'transparent',
+      boxShadow: active && c.isDark ? `0 0 8px color-mix(in srgb, ${col} 20%, transparent)` : 'none',
     };
   }
 
@@ -346,8 +346,8 @@ export class ZonesDashboardComponent implements OnInit {
     const c = this.C();
     return {
       color: c.CYAN,
-      border: `1px solid ${c.CYAN}66`,
-      background: `${c.CYAN}11`,
+      border: `1px solid color-mix(in srgb, ${c.CYAN} 40%, transparent)`,
+      background: `color-mix(in srgb, ${c.CYAN} 7%, transparent)`,
       padding: '6px 14px',
       borderRadius: '6px',
       fontSize: '12px',
@@ -384,8 +384,8 @@ export class ZonesDashboardComponent implements OnInit {
     }
     return {
       color: active ? c.CYAN : c.MUTED,
-      border: `1px solid ${active ? c.CYAN + '88' : c.BORDER}`,
-      background: active ? c.CYAN + '18' : 'transparent',
+      border: `1px solid ${active ? 'color-mix(in srgb, ' + c.CYAN + ' 53%, transparent)' : c.BORDER}`,
+      background: active ? 'color-mix(in srgb, ' + c.CYAN + ' 9%, transparent)' : 'transparent',
       padding: '3px 8px',
       borderRadius: '5px',
       fontSize: '11px',
@@ -399,9 +399,9 @@ export class ZonesDashboardComponent implements OnInit {
     const col = score >= 95 ? c.GREEN : score >= 80 ? c.YELLOW : c.PINK;
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark ? `0 0 12px ${col}44` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark ? `0 0 12px color-mix(in srgb, ${col} 27%, transparent)` : 'none',
     };
   }
 

@@ -19,16 +19,16 @@
         <div class="flex items-center gap-2 mb-1 flex-wrap">
           <span class="text-[11px] px-2 py-0.5 rounded border font-bold tracking-wider"
                 [style.color]="zoneColor()"
-                [style.border-color]="zoneColor() + '55'"
-                [style.background]="zoneColor() + '18'"
-                [style.box-shadow]="C().isDark ? ('0 0 8px ' + zoneColor() + '44') : 'none'">
+                [style.border-color]="'color-mix(in srgb, ' + zoneColor() + ' 33%, transparent)'"
+                [style.background]="'color-mix(in srgb, ' + zoneColor() + ' 9%, transparent)'"
+                [style.box-shadow]="C().isDark ? ('0 0 8px ' + 'color-mix(in srgb, ' + zoneColor() + ' 27%, transparent)') : 'none'">
             {{ r.zone }}
           </span>
           <span class="text-[11px] px-2 py-0.5 rounded border font-bold tracking-wider"
                 [style.color]="statusColor()"
-                [style.border-color]="statusColor() + '55'"
-                [style.background]="statusColor() + '18'"
-                [style.box-shadow]="C().isDark ? ('0 0 8px ' + statusColor() + '44') : 'none'">
+                [style.border-color]="'color-mix(in srgb, ' + statusColor() + ' 33%, transparent)'"
+                [style.background]="'color-mix(in srgb, ' + statusColor() + ' 9%, transparent)'"
+                [style.box-shadow]="C().isDark ? ('0 0 8px ' + 'color-mix(in srgb, ' + statusColor() + ' 27%, transparent)') : 'none'">
             {{ r.status }}
           </span>
         </div>
@@ -140,7 +140,7 @@
               <div class="h-full rounded-full transition-all duration-700"
                    [style.width]="h.score + '%'"
                    [style.background]="donutColor()"
-                   [style.box-shadow]="C().isDark ? ('0 0 8px ' + donutColor() + '88') : 'none'">
+                   [style.box-shadow]="C().isDark ? ('0 0 8px ' + 'color-mix(in srgb, ' + donutColor() + ' 53%, transparent)') : 'none'">
               </div>
             </div>
           </div>
@@ -202,7 +202,7 @@
             <!-- Centre line -->
             <div class="absolute top-0 bottom-0 w-px"
                  style="left:50%"
-                 [style.background]="C().BORDER + 'cc'"></div>
+                 [style.background]="'color-mix(in srgb, ' + C().BORDER + ' 80%, transparent)'"></div>
             <!-- Marker -->
             <div class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 shadow-md z-10"
                  style="transition: left 0.5s ease"
@@ -244,7 +244,7 @@
             PV (actual)
           </span>
           <span class="flex items-center gap-1.5">
-            <span class="inline-block w-5 h-0 border-t-2 border-dashed" [style.border-color]="C().MUTED + 'aa'"></span>
+            <span class="inline-block w-5 h-0 border-t-2 border-dashed" [style.border-color]="'color-mix(in srgb, ' + C().MUTED + ' 67%, transparent)'"></span>
             SP (setpoint)
           </span>
           <span class="flex items-center gap-1.5">
@@ -363,7 +363,7 @@
           </span>
           <span class="text-[11px] font-semibold px-2 py-0.5 rounded"
                 [style.color]="C().MUTED"
-                [style.background]="C().BORDER + '55'">
+                [style.background]="'color-mix(in srgb, ' + C().BORDER + ' 33%, transparent)'">
             {{ batchRows().length }} tags
           </span>
         </div>
@@ -375,7 +375,7 @@
 
         <div *ngFor="let t of batchRows(); let odd = odd"
              class="px-4 py-2.5 flex items-center gap-3"
-             [style.background]="odd ? (C().BORDER + '22') : 'transparent'"
+             [style.background]="odd ? ('color-mix(in srgb, ' + C().BORDER + ' 13%, transparent)') : 'transparent'"
              [class.opacity-60]="t.id === r.id">
 
           <!-- Status dot -->
@@ -402,7 +402,7 @@
             <div class="relative h-1.5 rounded-full overflow-visible" [style.background]="C().BORDER">
               <!-- zero marker -->
               <div class="absolute top-0 bottom-0 w-px" style="left:50%"
-                   [style.background]="C().MUTED + '66'"></div>
+                   [style.background]="'color-mix(in srgb, ' + C().MUTED + ' 40%, transparent)'"></div>
               <!-- fill from centre -->
               <div class="absolute top-0 h-full rounded-full"
                    [style.background]="siblingDevColor(t.dev)"

@@ -85,8 +85,8 @@
       <span *ngFor="let a of allAlerts(snap)"
             class="px-2 py-0.5 rounded border"
             [style.color]="severityColor(a)"
-            [style.border-color]="severityColor(a) + '44'"
-            [style.background]="severityColor(a) + '11'">
+            [style.border-color]="'color-mix(in srgb, ' + severityColor(a) + ' 27%, transparent)'"
+            [style.background]="'color-mix(in srgb, ' + severityColor(a) + ' 7%, transparent)'">
         <span class="font-bold">{{ a.ruleId }}</span> · {{ a.message }}
       </span>
     </div>

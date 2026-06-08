@@ -104,9 +104,9 @@ export class SiloZoneComponent {
     else if (t.includes('LILAC')) col = '#c084fc';
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark && type ? `0 0 8px ${col}33` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark && type ? `0 0 8px color-mix(in srgb, ${col} 20%, transparent)` : 'none',
     };
   }
 
@@ -115,9 +115,9 @@ export class SiloZoneComponent {
     const col = state === 'ACTIVE' ? c.GREEN : c.MUTED;
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark && state === 'ACTIVE' ? `0 0 8px ${col}44` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark && state === 'ACTIVE' ? `0 0 8px color-mix(in srgb, ${col} 27%, transparent)` : 'none',
     };
   }
 
@@ -153,7 +153,7 @@ export class SiloZoneComponent {
   }
   titleStyle() {
     const c = this.C();
-    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px ${c.CYAN}66` : 'none' };
+    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${c.CYAN} 40%, transparent)` : 'none' };
   }
   headRowStyle() {
     const c = this.C();

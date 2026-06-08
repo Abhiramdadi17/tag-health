@@ -1,8 +1,8 @@
-<div class="flex h-screen flex-col"
+<div class="flex h-screen flex-col overflow-hidden"
      [style.background]="C().BG_BASE"
      [style.color]="C().TEXT">
   <app-top-navbar></app-top-navbar>
-  <main class="flex-1 overflow-auto">
+  <main class="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
     <router-outlet></router-outlet>
   </main>
 </div>

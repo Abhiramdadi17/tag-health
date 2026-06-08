@@ -85,6 +85,14 @@ export class UnifiedTagsTableComponent {
   filterChange          = output<ZoneFilterEvent>();
   resetFilters          = output<void>();
 
+  // Search + status bar (moved into the sticky header)
+  filter         = input<string>('');
+  loading        = input<boolean>(false);
+  error          = input<string | null>(null);
+  globalHealth   = input<number>(0);
+  filterTextChange = output<string>();
+  refresh          = output<void>();
+
   psmVisible     = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'PSM');
   sigmaVisible   = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'SIGMA');
   siloVisible    = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'SILO');
@@ -174,9 +182,9 @@ export class UnifiedTagsTableComponent {
       c.ORANGE;
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark ? `0 0 6px ${col}33` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark ? `0 0 6px color-mix(in srgb, ${col} 20%, transparent)` : 'none',
     };
   }
 
@@ -188,9 +196,9 @@ export class UnifiedTagsTableComponent {
     else if (bucket === 'IDLE') col = c.MUTED;
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark ? `0 0 8px ${col}33` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${col} 20%, transparent)` : 'none',
     };
   }
 
@@ -213,8 +221,8 @@ export class UnifiedTagsTableComponent {
     const col = this.healthColor(score);
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
     };
   }
 
@@ -273,6 +281,45 @@ export class UnifiedTagsTableComponent {
     return bag[key] ?? ['ALL'];
   }
 
+  healthHeroStyle() {
+    const c = this.C();
+    const score = this.globalHealth();
+    const col = score >= 95 ? c.GREEN : score >= 80 ? c.YELLOW : c.PINK;
+    return {
+      color: col,
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark ? `0 0 12px color-mix(in srgb, ${col} 27%, transparent)` : 'none',
+    };
+  }
+
+  searchStyle() {
+    const c = this.C();
+    return {
+      background: c.BG_CARD,
+      color: c.TEXT,
+      border: `1px solid ${c.BORDER}`,
+      borderRadius: '6px',
+      padding: '6px 10px',
+      fontSize: '13px',
+      flex: '1',
+    };
+  }
+
+  refreshBtnStyle() {
+    const c = this.C();
+    return {
+      color: c.CYAN,
+      border: `1px solid color-mix(in srgb, ${c.CYAN} 40%, transparent)`,
+      background: `color-mix(in srgb, ${c.CYAN} 7%, transparent)`,
+      padding: '6px 14px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+    };
+  }
+
   // ---- shared table styling ----
   headerStyle() {
     const c = this.C();
@@ -280,7 +327,7 @@ export class UnifiedTagsTableComponent {
   }
   titleStyle() {
     const c = this.C();
-    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px ${c.CYAN}66` : 'none' };
+    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${c.CYAN} 40%, transparent)` : 'none' };
   }
   headRowStyle() {
     const c = this.C();
@@ -304,8 +351,8 @@ export class UnifiedTagsTableComponent {
     const active = this.activePreset() === preset;
     return {
       color: active ? c.CYAN : c.MUTED,
-      border: `1px solid ${active ? c.CYAN + '88' : c.BORDER}`,
-      background: active ? c.CYAN + '18' : 'transparent',
+      border: `1px solid ${active ? 'color-mix(in srgb, ' + c.CYAN + ' 53%, transparent)' : c.BORDER}`,
+      background: active ? 'color-mix(in srgb, ' + c.CYAN + ' 9%, transparent)' : 'transparent',
       padding: '3px 8px',
       borderRadius: '4px',
       fontSize: '12px',
@@ -319,9 +366,9 @@ export class UnifiedTagsTableComponent {
     const on = this.onlyDataAvailable();
     return {
       color: on ? c.GREEN : c.MUTED,
-      borderColor: on ? c.GREEN + '88' : c.BORDER,
-      background: on ? c.GREEN + '15' : 'transparent',
-      border: `1px solid ${on ? c.GREEN + '88' : c.BORDER}`,
+      borderColor: on ? 'color-mix(in srgb, ' + c.GREEN + ' 53%, transparent)' : c.BORDER,
+      background: on ? 'color-mix(in srgb, ' + c.GREEN + ' 8%, transparent)' : 'transparent',
+      border: `1px solid ${on ? 'color-mix(in srgb, ' + c.GREEN + ' 53%, transparent)' : c.BORDER}`,
       borderRadius: '5px',
       padding: '4px 10px',
       fontSize: '13px',
@@ -334,16 +381,14 @@ export class UnifiedTagsTableComponent {
     };
   }
 
-  /** Sticky wrapper — title bar + zone filters, top:0 within the page scroll container. */
+  /** Header block — sits OUTSIDE the scroll container (flex-shrink-0),
+   *  so it never scrolls horizontally. No position:sticky needed. */
   stickyTitleStyle() {
     const c = this.C();
     return {
-      position: 'sticky' as const,
-      top: '0px',
-      zIndex: 20,
       background: c.BG_PANEL,
-      /* Fill the gap above with the same panel colour so no void shows during scroll */
-      boxShadow: `0 -60px 0 60px ${c.BG_PANEL}`,
+      borderBottom: `1px solid ${c.BORDER}`,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
     };
   }
 
@@ -360,9 +405,17 @@ export class UnifiedTagsTableComponent {
     };
   }
 
+  /** Column headers sticky inside the scroll container — stick to top
+   *  as the user scrolls the table rows vertically. */
   stickyTheadStyle() {
     const c = this.C();
-    return { background: c.BG_BASE };
+    return {
+      position: 'sticky' as const,
+      top: '0px',
+      zIndex: 20,
+      background: c.BG_BASE,
+      boxShadow: `0 1px 0 0 ${c.BORDER}`,
+    };
   }
   thStyle(key: SortKey | null) {
     const c = this.C();

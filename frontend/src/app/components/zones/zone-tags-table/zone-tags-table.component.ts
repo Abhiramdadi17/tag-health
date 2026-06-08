@@ -175,9 +175,9 @@ export class ZoneTagsTableComponent {
     }
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark ? `0 0 8px ${col}33` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${col} 20%, transparent)` : 'none',
     };
   }
 
@@ -199,7 +199,7 @@ export class ZoneTagsTableComponent {
     const c = this.C();
     if (!cascade) return { color: c.MUTED };
     const col = cascade === 'CAS3' ? c.CYAN : c.ORANGE;
-    return { color: col, borderColor: `${col}44`, background: `${col}11` };
+    return { color: col, borderColor: `color-mix(in srgb, ${col} 27%, transparent)`, background: `color-mix(in srgb, ${col} 7%, transparent)` };
   }
 
   // ---- shared table styling ----
@@ -209,7 +209,7 @@ export class ZoneTagsTableComponent {
   }
   titleStyle() {
     const c = this.C();
-    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px ${c.CYAN}66` : 'none' };
+    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${c.CYAN} 40%, transparent)` : 'none' };
   }
   headRowStyle() {
     const c = this.C();

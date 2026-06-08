@@ -137,13 +137,13 @@
 
       <ng-container *ngIf="pred.spike_probability.in_batch != null">
         <div class="p-3 rounded border mb-3"
-             [style.background]="probabilityColor(pred.spike_probability.in_batch * 100) + '0a'"
-             [style.border-color]="probabilityColor(pred.spike_probability.in_batch * 100) + '44'">
+             [style.background]="'color-mix(in srgb, ' + probabilityColor(pred.spike_probability.in_batch * 100) + ' 4%, transparent)'"
+             [style.border-color]="'color-mix(in srgb, ' + probabilityColor(pred.spike_probability.in_batch * 100) + ' 27%, transparent)'">
           <div class="flex items-center justify-between mb-1">
             <p class="text-xs font-semibold" [style.color]="C().TEXT">Batch spike probability</p>
             <p class="text-xl font-bold"
                [style.color]="probabilityColor(pred.spike_probability.in_batch * 100)"
-               [style.text-shadow]="C().isDark ? ('0 0 8px ' + probabilityColor(pred.spike_probability.in_batch * 100) + '88') : 'none'">
+               [style.text-shadow]="C().isDark ? ('0 0 8px color-mix(in srgb, ' + probabilityColor(pred.spike_probability.in_batch * 100) + ' 53%, transparent)') : 'none'">
               {{ (pred.spike_probability.in_batch * 100).toFixed(0) }}%
             </p>
           </div>

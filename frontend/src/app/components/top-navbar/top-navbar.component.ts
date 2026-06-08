@@ -33,42 +33,50 @@ export class TopNavbarComponent {
     this.settingsSvc.toggleTheme();
   }
 
+  navbarStyle() {
+    const c = this.C();
+    return {
+      background: c.BG_PANEL,
+      borderBottom: `1.5px solid ${c.BORDER}`,
+    };
+  }
+
   pillStyle() {
     const c = this.C();
     return {
       background: c.BG_CARD,
-      border: `1px solid ${c.BORDER}`,
-      color: c.MUTED,
+      borderColor: c.BORDER,
     };
   }
 
-  liveDotStyle() {
+  inputStyle() {
     const c = this.C();
     return {
-      background: this.isStreaming() ? c.GREEN : c.MUTED,
+      background:  c.BG_CARD,
+      color:       c.TEXT,
+      borderColor: c.BORDER,
     };
   }
 
   alertBadgeStyle() {
     const c = this.C();
+    if (c.isDark) {
+      return {
+        background: `color-mix(in srgb, ${c.PINK} 13%, transparent)`,
+        borderColor: `color-mix(in srgb, ${c.PINK} 40%, transparent)`,
+        color: c.PINK,
+        boxShadow: `0 0 8px color-mix(in srgb, ${c.PINK} 27%, transparent)`,
+      };
+    }
     return {
-      background: `${c.PINK}22`,
-      borderColor: `${c.PINK}66`,
-      color: c.PINK,
-      boxShadow: c.isDark ? `0 0 8px ${c.PINK}44` : 'none',
+      background: '#FEF2F2',
+      borderColor: '#FECACA',
+      color: '#991B1B',
     };
   }
 
-  logoStyle() {
-    const c = this.C();
-    return {
-      color: c.CYAN,
-      textShadow: c.isDark ? `0 0 10px ${c.CYAN}66` : 'none',
-    };
-  }
-
-  setHoverCyan(ev: MouseEvent): void {
-    (ev.currentTarget as HTMLElement).style.color = this.C().CYAN;
+  setHoverAccent(ev: MouseEvent): void {
+    (ev.currentTarget as HTMLElement).style.color = this.C().INDIGO;
   }
   setHoverMuted(ev: MouseEvent): void {
     (ev.currentTarget as HTMLElement).style.color = this.C().MUTED;

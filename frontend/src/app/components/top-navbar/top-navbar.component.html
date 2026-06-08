@@ -1,19 +1,48 @@
-<header class="sticky top-0 z-40 border-b"
-        [style.background]="C().BG_PANEL"
-        [style.border-color]="C().BORDER">
+<header class="sticky top-0 z-40"
+        [ngStyle]="navbarStyle()">
   <div class="h-14 px-6 flex items-center justify-between">
-    <!-- Logo + plant selector -->
-    <div class="flex items-center gap-4">
-      <div class="font-bold text-base tracking-widest" [ngStyle]="logoStyle()">
-        TAG MONITOR
+
+    <!-- Left: Logo + nav -->
+    <div class="flex items-center gap-5">
+      <!-- Logo -->
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded" style="background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="1" y="1" width="4" height="4" rx="0.5" fill="white" opacity="0.9"/>
+            <rect x="7" y="1" width="4" height="4" rx="0.5" fill="white" opacity="0.6"/>
+            <rect x="1" y="7" width="4" height="4" rx="0.5" fill="white" opacity="0.6"/>
+            <rect x="7" y="7" width="4" height="4" rx="0.5" fill="white" opacity="0.9"/>
+          </svg>
+        </div>
+        <span class="font-heading text-base tracking-wide" [style.color]="C().TEXT">
+          TAG MONITOR
+        </span>
       </div>
-      <nav class="flex items-center gap-1 text-xs">
-        <a routerLink="/zones" routerLinkActive="active-nav"
-           class="px-3 py-1 rounded transition-colors" [style.color]="C().MUTED"
-           (mouseenter)="setHoverCyan($event)" (mouseleave)="setHoverMuted($event)">Zones</a>
+
+      <!-- Nav links -->
+      <nav class="flex items-center gap-1">
+        <a routerLink="/zones" routerLinkActive="nav-active"
+           class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+           style="font-family:'Figtree',sans-serif;letter-spacing:0.03em;"
+           [style.color]="C().MUTED"
+           (mouseenter)="setHoverAccent($event)"
+           (mouseleave)="setHoverMuted($event)">
+          Zones
+        </a>
+        <a routerLink="/" routerLinkActive="nav-active"
+           [routerLinkActiveOptions]="{exact:true}"
+           class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+           style="font-family:'Figtree',sans-serif;letter-spacing:0.03em;"
+           [style.color]="C().MUTED"
+           (mouseenter)="setHoverAccent($event)"
+           (mouseleave)="setHoverMuted($event)">
+          Dashboard
+        </a>
       </nav>
-      <select class="px-3 py-1 rounded text-sm"
-              [ngStyle]="pillStyle()"
+
+      <!-- Plant selector -->
+      <select class="filter-select"
+              [ngStyle]="inputStyle()"
               [style.color]="C().TEXT">
         <option>Plant A</option>
         <option>Plant B</option>
@@ -21,52 +50,56 @@
       </select>
     </div>
 
-    <!-- Right side -->
-    <div class="flex items-center gap-3">
-      <!-- Live indicator -->
-      <div class="flex items-center gap-2 px-3 py-1 rounded text-xs font-medium border"
+    <!-- Right: status indicators -->
+    <div class="flex items-center gap-2">
+
+      <!-- LIVE indicator -->
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border"
            [ngStyle]="pillStyle()">
-        <div class="w-2 h-2 rounded-full"
-             [ngStyle]="liveDotStyle()"
-             [class.animate-live-pulse]="isStreaming()"></div>
-        <span [style.color]="C().TEXT">{{ isStreaming() ? 'LIVE' : 'OFFLINE' }}</span>
+        <div *ngIf="isStreaming()" class="live-dot"></div>
+        <div *ngIf="!isStreaming()" class="w-2 h-2 rounded-full" [style.background]="C().MUTED"></div>
+        <span class="text-xs font-semibold" style="font-family:'Figtree',sans-serif;letter-spacing:0.04em;"
+              [style.color]="C().TEXT">
+          {{ isStreaming() ? 'LIVE' : 'OFFLINE' }}
+        </span>
       </div>
 
       <!-- Latency -->
-      <div class="text-xs px-3 py-1 rounded border" [ngStyle]="pillStyle()">
-        {{ latencyMs() }}ms
+      <div class="metric-readout px-3 py-1.5 rounded-lg border"
+           [ngStyle]="pillStyle()">
+        {{ latencyMs() }}<span [style.color]="C().MUTED">ms</span>
       </div>
 
       <!-- GPU -->
-      <div class="text-xs px-3 py-1 rounded border" [ngStyle]="pillStyle()">
-        GPU {{ (gpuLoad() * 100).toFixed(0) }}%
+      <div class="metric-readout px-3 py-1.5 rounded-lg border"
+           [ngStyle]="pillStyle()">
+        GPU <span class="font-semibold" [style.color]="C().TEXT">{{ (gpuLoad() * 100).toFixed(0) }}</span>%
       </div>
 
       <!-- Alert badge -->
       <div *ngIf="alertCount() > 0"
-           class="flex items-center gap-2 px-3 py-1 rounded border text-xs font-bold"
+           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold"
            [ngStyle]="alertBadgeStyle()">
-        <lucide-angular [img]="AlertIcon" [size]="14"></lucide-angular>
+        <lucide-angular [img]="AlertIcon" [size]="13"></lucide-angular>
         <span>{{ alertCount() }}</span>
       </div>
 
+      <!-- Divider -->
+      <div class="w-px h-6 mx-1" [style.background]="C().BORDER"></div>
+
       <!-- Theme toggle -->
       <button (click)="toggleTheme()"
-              class="p-2 rounded transition-colors"
+              class="p-2 rounded-lg transition-colors hover:bg-gray-100"
               [title]="theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
-              [style.color]="C().MUTED"
-              (mouseenter)="setHoverCyan($event)"
-              (mouseleave)="setHoverMuted($event)">
-        <lucide-angular *ngIf="theme() === 'dark'" [img]="SunIcon" [size]="16"></lucide-angular>
-        <lucide-angular *ngIf="theme() === 'light'" [img]="MoonIcon" [size]="16"></lucide-angular>
+              [style.color]="C().MUTED">
+        <lucide-angular *ngIf="theme() === 'dark'" [img]="SunIcon" [size]="15"></lucide-angular>
+        <lucide-angular *ngIf="theme() === 'light'" [img]="MoonIcon" [size]="15"></lucide-angular>
       </button>
 
       <!-- Menu -->
-      <button class="p-2 rounded transition-colors"
-              [style.color]="C().MUTED"
-              (mouseenter)="setHoverCyan($event)"
-              (mouseleave)="setHoverMuted($event)">
-        <lucide-angular [img]="MenuIcon" [size]="16"></lucide-angular>
+      <button class="p-2 rounded-lg transition-colors hover:bg-gray-100"
+              [style.color]="C().MUTED">
+        <lucide-angular [img]="MenuIcon" [size]="15"></lucide-angular>
       </button>
     </div>
   </div>

@@ -1,10 +1,33 @@
-<div class="rounded-lg border" [ngStyle]="headerStyle()">
+<div class="flex flex-col h-full" [ngStyle]="headerStyle()">
 
-  <!-- ── Sticky wrapper: title bar + zone filters ──────────────────── -->
-  <div [ngStyle]="stickyTitleStyle()">
+  <!-- ── NON-SCROLLING header: search + title + dates + zone filters ── -->
+  <!-- This sits outside the overflow-auto container, so horizontal
+       scrolling of the table rows never moves this section. -->
+  <div class="flex-shrink-0" [ngStyle]="stickyTitleStyle()">
+
+    <!-- Row 0: Search + Health + Refresh -->
+    <div class="px-4 py-2 flex items-center gap-2 border-b"
+         [style.border-color]="C().BORDER"
+         [style.background]="C().BG_PANEL">
+      <input type="text"
+             placeholder="Search tag, machine, recipe…"
+             [ngStyle]="searchStyle()"
+             [ngModel]="filter()"
+             (ngModelChange)="filterTextChange.emit($event)" />
+      <span *ngIf="loading()" class="text-[11px] font-bold animate-pulse"
+            [style.color]="C().YELLOW">LOADING…</span>
+      <span *ngIf="error()" class="text-[11px] font-bold"
+            [style.color]="C().PINK">{{ error() }}</span>
+      <div class="px-2.5 py-0.5 rounded border text-[11px] font-bold tracking-wider"
+           [ngStyle]="healthHeroStyle()"
+           [title]="rows().length + ' rows in view'">
+        {{ globalHealth().toFixed(1) }}%
+      </div>
+      <button type="button" [ngStyle]="refreshBtnStyle()" (click)="refresh.emit()">REFRESH</button>
+    </div>
 
     <!-- Row 1: title + primary filters -->
-    <div class="px-4 pt-2 pb-2 flex items-center gap-3 rounded-t-lg"
+    <div class="px-4 pt-2 pb-2 flex items-center gap-3"
          [style.background]="C().BG_PANEL">
 
       <!-- Title + subtitle -->
@@ -92,7 +115,7 @@
           <span *ngIf="activeFilterCount() > 0"
                 class="text-xs font-bold px-1.5 py-0.5 rounded-full"
                 [style.color]="C().CYAN"
-                [style.background]="C().CYAN + '22'">
+                [style.background]="'color-mix(in srgb, ' + C().CYAN + ' 13%, transparent)'">
             {{ activeFilterCount() }} active
           </span>
         </div>
@@ -255,6 +278,10 @@
 
   </div><!-- /sticky wrapper -->
 
+  <!-- ── Scrollable area: table + empty state ─────────────────────── -->
+  <!-- ONLY this div scrolls horizontally; the header above never moves. -->
+  <div class="flex-1 min-h-0 overflow-auto">
+
   <!-- ── Table ──────────────────────────────────────────────────────── -->
   <table class="w-full text-sm min-w-[900px]">
 
@@ -363,4 +390,7 @@
   <div *ngIf="rows().length === 0" class="text-center py-12 text-sm" [style.color]="C().MUTED">
     No rows match the active filters.
   </div>
-</div>
+
+  </div><!-- /scroll container -->
+
+</div><!-- /flex-col outer -->

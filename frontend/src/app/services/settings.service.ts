@@ -1,10 +1,10 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, NgZone, inject, signal, effect } from '@angular/core';
 import { DashboardSettings } from '../types';
 
 const STORAGE_KEY = 'dashboard-settings';
 
 const defaultSettings: DashboardSettings = {
-  theme: 'dark',
+  theme: 'light',
   updateFrequency: 5,
   chartType: 'recharts',
   replayMode: false,
@@ -24,8 +24,20 @@ function loadSettings(): DashboardSettings {
   }
 }
 
+/** Apply/remove the `dark` class on <html> immediately. */
+function applyThemeClass(theme: 'dark' | 'light'): void {
+  if (typeof document === 'undefined') return;
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
+  private ngZone = inject(NgZone);
+
   readonly settings = signal<DashboardSettings>(loadSettings());
 
   readonly theme = () => this.settings().theme;
@@ -36,6 +48,32 @@ export class SettingsService {
   readonly replayMode = () => this.settings().replayMode;
 
   constructor() {
+    // Apply the correct theme class on startup (before transitions are enabled).
+    // Flip outside Angular's zone — it's a pure DOM mutation that has nothing
+    // to do with Angular's change-detection cycle, so we don't want it to
+    // trigger one.
+    this.ngZone.runOutsideAngular(() => {
+      applyThemeClass(this.settings().theme);
+
+      // After a short delay, add `.theme-ready` so CSS transitions kick in only
+      // for *user-initiated* toggling — not the initial page render.
+      if (typeof document !== 'undefined') {
+        setTimeout(() => {
+          document.documentElement.classList.add('theme-ready');
+        }, 300);
+      }
+    });
+
+    // Keep <html>.dark in sync whenever the signal changes. The effect itself
+    // runs inside Angular (we need to *read* the signal), but the DOM write
+    // is pushed outside the zone so the class flip doesn't schedule another
+    // change-detection pass.
+    effect(() => {
+      const theme = this.settings().theme;
+      this.ngZone.runOutsideAngular(() => applyThemeClass(theme));
+    });
+
+    // Persist to localStorage
     effect(() => {
       const value = this.settings();
       try {

@@ -38,9 +38,9 @@ export class SigmaMixerZoneComponent {
     const col = s === 2 ? c.CYAN : s === 3 ? c.GREEN : c.MUTED;
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark ? `0 0 8px ${col}44` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${col} 27%, transparent)` : 'none',
     };
   }
 
@@ -84,9 +84,9 @@ export class SigmaMixerZoneComponent {
     const col = active ? c.ORANGE : c.MUTED;
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
-      boxShadow: c.isDark && active ? `0 0 8px ${col}44` : 'none',
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      boxShadow: c.isDark && active ? `0 0 8px color-mix(in srgb, ${col} 27%, transparent)` : 'none',
     };
   }
 
@@ -106,7 +106,7 @@ export class SigmaMixerZoneComponent {
   }
   titleStyle() {
     const c = this.C();
-    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px ${c.CYAN}66` : 'none' };
+    return { color: c.CYAN, textShadow: c.isDark ? `0 0 8px color-mix(in srgb, ${c.CYAN} 40%, transparent)` : 'none' };
   }
   headRowStyle() {
     const c = this.C();

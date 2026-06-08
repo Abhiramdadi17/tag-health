@@ -2,66 +2,489 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --neon-green:  #00ff88;
-  --neon-cyan:   #00e5ff;
-  --neon-pink:   #ff2d78;
-  --neon-orange: #ff6a00;
-  --neon-yellow: #ffe600;
-  --neon-purple: #bf5fff;
+/* ─── DESIGN TOKENS ─────────────────────────────────────── */
+/* Dark-mode overrides: flip all tokens when <html> has .dark */
+html.dark {
+  /* Page surfaces */
+  --bg-base:    #080d18;
+  --bg-panel:   #0d1526;
+  --bg-card:    #111c33;
+  --bg-row-alt: #0f1a2e;
+  --bg-hover:   #172038;
 
-  --bg-base:   #080d18;
-  --bg-panel:  #0d1526;
-  --bg-card:   #111c33;
-  --border:    #1e2d4a;
+  /* Borders */
+  --border:      #1e2d4a;
+  --border-soft: #162035;
+
+  /* Text */
+  --text-primary:   #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --text-header:    #94a3b8;
+
+  /* Accent stays indigo-ish but brighter */
+  --indigo:    #818cf8;
+  --indigo-bg: rgba(129,140,248,0.12);
+
+  /* Input controls */
+  --input-border:       #1e2d4a;
+  --input-placeholder:  #475569;
+  --input-focus:        #00e5ff;
+
+  /* Status chips: keep semantic colours, just slightly softer */
+  --ok-bg:     rgba(0,255,136,0.12);
+  --ok-text:   #00ff88;
+  --ok-border: rgba(0,255,136,0.3);
+
+  --normal-bg:     rgba(148,163,184,0.10);
+  --normal-text:   #94a3b8;
+  --normal-border: rgba(148,163,184,0.25);
+
+  --critical-bg:     rgba(255,45,120,0.12);
+  --critical-text:   #ff2d78;
+  --critical-border: rgba(255,45,120,0.3);
+
+  --alert-bg:     rgba(255,230,0,0.10);
+  --alert-text:   #ffe600;
+  --alert-border: rgba(255,230,0,0.25);
+
+  /* Zone badges: keep readable in dark */
+  --zone-sigma-bg:    rgba(139,92,246,0.18);
+  --zone-sigma-text:  #c4b5fd;
+  --zone-psm-bg:      rgba(245,158,11,0.15);
+  --zone-psm-text:    #fcd34d;
+  --zone-silo-bg:     rgba(0,255,136,0.12);
+  --zone-silo-text:   #6ee7b7;
+  --zone-pkg-bg:      rgba(255,45,120,0.12);
+  --zone-pkg-text:    #fda4af;
+
+  /* DEV% */
+  --dev-pos:    #00ff88;
+  --dev-pos-bg: rgba(0,255,136,0.10);
+  --dev-neg:    #ff2d78;
+  --dev-neg-bg: rgba(255,45,120,0.10);
+  --dev-zero:   #64748b;
+
+  /* Scrollbar */
+  --scrollbar-thumb: #1e2d4a;
+  --scrollbar-hover: rgba(0,229,255,0.25);
+
+  /* Date pills */
+  --pill-inactive-bg:     #111c33;
+  --pill-inactive-border: #1e2d4a;
+  --pill-inactive-text:   #94a3b8;
+  --pill-active-bg:       #e2e8f0;
+  --pill-active-text:     #080d18;
+  --pill-hover-bg:        #1e2d4a;
+
+  /* Health badges */
+  --health-good-text:   #00ff88;
+  --health-good-bg:     rgba(0,255,136,0.12);
+  --health-mid-text:    #ffe600;
+  --health-mid-bg:      rgba(255,230,0,0.10);
+  --health-bad-text:    #ff2d78;
+  --health-bad-bg:      rgba(255,45,120,0.12);
+
+  /* ThemeService surface — every field on ThemeColors as a CSS var.
+     Components read these via inline [ngStyle] returning 'var(--c-*)' strings
+     so the theme flip is a single attribute mutation, not a per-element
+     style recomputation. */
+  --c-bg-base:      #080d18;
+  --c-bg-panel:     #0d1526;
+  --c-bg-card:      #111c33;
+  --c-bg-row-alt:   #0f1a2e;
+  --c-bg-hover:     #172038;
+  --c-border:       #1e2d4a;
+  --c-border-soft:  #162035;
+  --c-text:         #e2e8f0;
+  --c-muted:        #64748b;
+  --c-header-text:  #94a3b8;
+  --c-cyan:         #00e5ff;
+  --c-green:        #00ff88;
+  --c-yellow:       #ffe600;
+  --c-orange:       #ff6a00;
+  --c-pink:         #ff2d78;
+  --c-indigo:       #818cf8;
 }
 
-html { scroll-behavior: smooth; }
 
+:root {
+  /* Page */
+  --bg-base:    #F4F3EE;
+  --bg-panel:   #FFFFFF;
+  --bg-card:    #FFFFFF;
+  --bg-row-alt: #FAFAF8;
+  --bg-hover:   #F7F6F2;
+
+  /* Borders */
+  --border:      #E3E2DC;
+  --border-soft: #F0EFE9;
+
+  /* Text */
+  --text-primary:   #1C1917;
+  --text-secondary: #6B7280;
+  --text-muted:     #9CA3AF;
+  --text-header:    #6B6A64;
+
+  /* Accent */
+  --indigo:    #6366F1;
+  --indigo-bg: rgba(99,102,241,0.08);
+
+  /* Status - OK */
+  --ok-bg:     #DCFCE7;
+  --ok-text:   #166534;
+  --ok-border: #BBF7D0;
+
+  /* Status - NORMAL */
+  --normal-bg:     #F3F4F6;
+  --normal-text:   #374151;
+  --normal-border: #D1D5DB;
+
+  /* Status - CRITICAL */
+  --critical-bg:     #FEF2F2;
+  --critical-text:   #991B1B;
+  --critical-border: #FECACA;
+
+  /* Status - ALERT/WARNING */
+  --alert-bg:     #FEF3C7;
+  --alert-text:   #92400E;
+  --alert-border: #FDE68A;
+
+  /* DEV% */
+  --dev-pos:    #059669;
+  --dev-pos-bg: #F0FDF4;
+  --dev-neg:    #DC2626;
+  --dev-neg-bg: #FEF2F2;
+  --dev-zero:   #6B7280;
+
+  /* Zone badges */
+  --zone-sigma-bg:    #EDE9FE;
+  --zone-sigma-text:  #5B21B6;
+  --zone-psm-bg:      #FEF3C7;
+  --zone-psm-text:    #92400E;
+  --zone-silo-bg:     #D1FAE5;
+  --zone-silo-text:   #065F46;
+  --zone-pkg-bg:      #FEE2E2;
+  --zone-pkg-text:    #991B1B;
+
+  /* Search/filter */
+  --input-border:       #D1D0CA;
+  --input-placeholder:  #A8A7A2;
+  --input-focus:        #6366F1;
+
+  /* Date pills */
+  --pill-inactive-bg:     #F4F3EE;
+  --pill-inactive-border: #D1D0CA;
+  --pill-inactive-text:   #374151;
+  --pill-active-bg:       #1C1917;
+  --pill-active-text:     #FAFAF8;
+  --pill-hover-bg:        #E7E5E0;
+
+  /* Health badge colors */
+  --health-good-text:   #166534;
+  --health-good-bg:     #DCFCE7;
+  --health-mid-text:    #92400E;
+  --health-mid-bg:      #FEF3C7;
+  --health-bad-text:    #991B1B;
+  --health-bad-bg:      #FEE2E2;
+
+  /* Scrollbar */
+  --scrollbar-thumb: #D1D0CA;
+  --scrollbar-hover: #A8A7A2;
+
+  /* ThemeService surface — light defaults (see html.dark for dark overrides). */
+  --c-bg-base:      #F4F3EE;
+  --c-bg-panel:     #FFFFFF;
+  --c-bg-card:      #FFFFFF;
+  --c-bg-row-alt:   #FAFAF8;
+  --c-bg-hover:     #F7F6F2;
+  --c-border:       #E3E2DC;
+  --c-border-soft:  #F0EFE9;
+  --c-text:         #1C1917;
+  --c-muted:        #6B7280;
+  --c-header-text:  #6B6A64;
+  --c-cyan:         #6366F1;
+  --c-green:        #059669;
+  --c-yellow:       #D97706;
+  --c-orange:       #EA580C;
+  --c-pink:         #DC2626;
+  --c-indigo:       #6366F1;
+}
+
+/* ─── BASE ───────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
 html, body { height: 100%; margin: 0; }
 
 body {
   background-color: var(--bg-base);
-  color: #e2e8f0;
-  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text-primary);
+  font-family: 'Figtree', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.neon-green  { color: var(--neon-green);  text-shadow: 0 0 8px var(--neon-green); }
-.neon-cyan   { color: var(--neon-cyan);   text-shadow: 0 0 8px var(--neon-cyan); }
-.neon-pink   { color: var(--neon-pink);   text-shadow: 0 0 8px var(--neon-pink); }
-.neon-orange { color: var(--neon-orange); text-shadow: 0 0 8px var(--neon-orange); }
-.neon-yellow { color: var(--neon-yellow); text-shadow: 0 0 8px var(--neon-yellow); }
-.neon-purple { color: var(--neon-purple); text-shadow: 0 0 8px var(--neon-purple); }
+/* ─── TYPOGRAPHY HELPERS ─────────────────────────────────── */
+.font-heading {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-weight: 700;
+}
 
-.glow-green  { box-shadow: 0 0 10px rgba(0,255,136,0.4),  0 0 2px rgba(0,255,136,0.8); }
-.glow-yellow { box-shadow: 0 0 10px rgba(255,230,0,0.4),  0 0 2px rgba(255,230,0,0.8); }
-.glow-orange { box-shadow: 0 0 10px rgba(255,106,0,0.4),  0 0 2px rgba(255,106,0,0.8); }
-.glow-pink   { box-shadow: 0 0 10px rgba(255,45,120,0.4), 0 0 2px rgba(255,45,120,0.8); }
-.glow-cyan   { box-shadow: 0 0 10px rgba(0,229,255,0.35), 0 0 2px rgba(0,229,255,0.7); }
+.font-ui {
+  font-family: 'Figtree', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
 
+.font-mono-val {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.font-tag {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ─── ZONE BADGES ────────────────────────────────────────── */
+.badge-zone {
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Figtree', system-ui, sans-serif;
+  padding: 2px 8px;
+  display: inline-block;
+  white-space: nowrap;
+  transition: transform 100ms ease;
+}
+.badge-zone:hover { transform: scale(1.02); }
+
+.badge-sigma    { background: var(--zone-sigma-bg); color: var(--zone-sigma-text); }
+.badge-psm      { background: var(--zone-psm-bg);   color: var(--zone-psm-text); }
+.badge-silo     { background: var(--zone-silo-bg);  color: var(--zone-silo-text); }
+.badge-packaging { background: var(--zone-pkg-bg);  color: var(--zone-pkg-text); }
+
+/* ─── STATUS CHIPS ───────────────────────────────────────── */
+.chip-status {
+  font-size: 11px;
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-weight: 600;
+  font-family: 'Figtree', system-ui, sans-serif;
+  display: inline-block;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: transform 100ms ease;
+}
+.chip-status:hover { transform: scale(1.02); }
+
+.chip-ok       { background: var(--ok-bg);       color: var(--ok-text);       border-color: var(--ok-border); }
+.chip-normal   { background: var(--normal-bg);    color: var(--normal-text);   border-color: var(--normal-border); }
+.chip-critical { background: var(--critical-bg);  color: var(--critical-text); border-color: var(--critical-border); }
+.chip-alert    { background: var(--alert-bg);     color: var(--alert-text);    border-color: var(--alert-border); }
+
+/* ─── DEV% PILLS ─────────────────────────────────────────── */
+.dev-pill {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-block;
+  text-align: right;
+}
+.dev-positive { color: var(--dev-pos); background: var(--dev-pos-bg); }
+.dev-negative { color: var(--dev-neg); background: var(--dev-neg-bg); }
+.dev-zero     { color: var(--dev-zero); }
+
+/* ─── TABLE ──────────────────────────────────────────────── */
+.tbl-header-row {
+  background: #EDECE6;
+}
+.tbl-header-cell {
+  font-family: 'Figtree', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-header);
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: #EDECE6;
+  z-index: 1;
+  white-space: nowrap;
+}
+.tbl-row {
+  height: 48px;
+  border-bottom: 0.5px solid var(--border-soft);
+  transition: background 120ms ease;
+  cursor: pointer;
+}
+.tbl-row:hover { background: var(--bg-hover); }
+.tbl-row:nth-child(even) { background: var(--bg-row-alt); }
+.tbl-row:nth-child(even):hover { background: var(--bg-hover); }
+.tbl-cell {
+  padding: 0 16px;
+  vertical-align: middle;
+  font-family: 'Figtree', system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.tbl-cell-tag {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-cell-zone {
+  width: 80px;
+  text-align: center;
+}
+.tbl-cell-numeric {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+/* ─── SEARCH BAR ─────────────────────────────────────────── */
+.search-bar {
+  background: inherit;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  height: 40px;
+  padding-left: 36px;
+  padding-right: 12px;
+  font-family: 'Figtree', system-ui, sans-serif;
+  font-size: 13px;
+  color: inherit;
+  outline: none;
+  transition: border-color 120ms ease;
+  width: 100%;
+}
+.search-bar::placeholder { color: var(--input-placeholder); }
+.search-bar:focus {
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
+}
+
+/* ─── FILTER DROPDOWNS ───────────────────────────────────── */
+.filter-select {
+  background: inherit;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  font-family: 'Figtree', system-ui, sans-serif;
+  font-size: 13px;
+  color: inherit;
+  padding: 6px 32px 6px 12px;
+  height: 40px;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+.filter-select:focus {
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
+}
+.filter-select option {
+  background: inherit;
+  color: inherit;
+}
+
+/* ─── DATE RANGE PILLS ───────────────────────────────────── */
+.date-pill {
+  background: var(--pill-inactive-bg);
+  border: 1px solid var(--pill-inactive-border);
+  color: var(--pill-inactive-text);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Figtree', system-ui, sans-serif;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.date-pill:hover { background: var(--pill-hover-bg); }
+.date-pill.active {
+  background: var(--pill-active-bg);
+  color: var(--pill-active-text);
+  border-color: transparent;
+}
+
+/* ─── LIVE INDICATOR ─────────────────────────────────────── */
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+/* ─── METRICS BAR ────────────────────────────────────────── */
+.metric-pill-health {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-weight: 700;
+  font-size: 14px;
+  font-family: 'Figtree', system-ui, sans-serif;
+  border-radius: 20px;
+  padding: 4px 14px;
+}
+.metric-readout {
+  font-family: 'DM Mono', 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ─── HEALTH SCORE BADGES ────────────────────────────────── */
+.health-good { background: var(--health-good-bg); color: var(--health-good-text); }
+.health-mid  { background: var(--health-mid-bg);  color: var(--health-mid-text); }
+.health-bad  { background: var(--health-bad-bg);  color: var(--health-bad-text); }
+
+/* ─── CARD / PANEL ───────────────────────────────────────── */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #00e5ff44; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #D1D0CA); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover, #A8A7A2); }
 
+/* ─── FORM ELEMENTS (light-mode defaults, no !important so dark theme can override) ── */
 input, select, textarea {
-  background-color: var(--bg-panel) !important;
-  color: #e2e8f0 !important;
-  border-color: var(--border) !important;
+  background-color: transparent;
+  color: inherit;
 }
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: #00e5ff !important;
-  box-shadow: 0 0 0 2px rgba(0,229,255,0.2) !important;
 }
-input::placeholder { color: #475569 !important; }
+input::placeholder { color: var(--input-placeholder); }
+option { background-color: inherit; color: inherit; }
 
-option { background-color: var(--bg-panel); color: #e2e8f0; }
-
-button:active { transform: scale(0.97); }
-
-/* Tag detail drawer slide-in animation */
+/* ─── SLIDE-IN ANIMATION ─────────────────────────────────── */
 @keyframes slide-in-right {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
@@ -70,8 +493,48 @@ button:active { transform: scale(0.97); }
   animation: slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-* {
-  transition-property: color, background-color, border-color, box-shadow;
+/* ─── DROPDOWN FADE-IN ───────────────────────────────────── */
+@keyframes dropdown-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-dropdown {
+  animation: dropdown-fade 150ms ease both;
+}
+
+/* ─── GLOBAL TRANSITIONS ─────────────────────────────────────
+   These apply to ALL elements once the page is ready.
+   During initial load the .theme-ready class is absent so we
+   don't get a flash; it's added by SettingsService after init.
+─────────────────────────────────────────────────────────────── */
+html.theme-ready,
+html.theme-ready body,
+html.theme-ready * {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 350ms;
+}
+
+/* Micro-interactions should still be fast — override where needed */
+html.theme-ready .tbl-row,
+html.theme-ready button,
+html.theme-ready a {
   transition-duration: 120ms;
 }
+
+button:active { transform: scale(0.97); }
+
+/* ─── ACTIVE NAV LINK ────────────────────────────────────── */
+.active-nav {
+  color: #6366F1 !important;
+  background: rgba(99,102,241,0.08);
+  border-radius: 6px;
+}
+
+/* ─── APP COMPONENT ROOT ─────────────────────────────────── */
+app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+

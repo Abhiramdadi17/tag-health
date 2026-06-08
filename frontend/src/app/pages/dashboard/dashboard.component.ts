@@ -38,6 +38,7 @@ export class DashboardComponent {
   selectedMaterial = signal('ALL');
   selectedStatus = signal('ALL');
   selectedTag = signal<TagRecord | null>(null);
+  dateRange = signal<'1h' | '6h' | '24h' | '7d'>('24h');
 
   plants = computed(() => ['ALL', ...Array.from(new Set(this.tags().map(t => t.plant)))]);
   recipes = computed(() => ['ALL', ...Array.from(new Set(this.tags().map(t => t.recipe)))]);
@@ -53,7 +54,8 @@ export class DashboardComponent {
       const matchesSearch =
         q === '' ||
         tag.synthetic_id.toLowerCase().includes(q) ||
-        tag.raw_material.toLowerCase().includes(q);
+        tag.raw_material.toLowerCase().includes(q) ||
+        (tag.batch_id?.toString() ?? '').toLowerCase().includes(q);
       return (
         matchesSearch &&
         (plant === 'ALL' || tag.plant === plant) &&
@@ -63,6 +65,29 @@ export class DashboardComponent {
       );
     });
   });
+
+  /** Health score: % of OK tags */
+  healthScore = computed(() => {
+    const all = this.tags();
+    if (!all.length) return '0.0';
+    const healthy = all.filter(t => t.health_status === 'OK').length;
+    return ((healthy / all.length) * 100).toFixed(1);
+  });
+
+  /** Unique batch count */
+  batchCount = computed(() =>
+    new Set(this.tags().map(t => t.batch_id)).size
+  );
+
+  /** Theme-aware style for input / select elements */
+  inputStyle() {
+    const c = this.C();
+    return {
+      background:  c.BG_CARD,
+      color:       c.TEXT,
+      borderColor: c.BORDER,
+    };
+  }
 
   selectedPrediction = computed(() => {
     const tag = this.selectedTag();
@@ -87,30 +112,8 @@ export class DashboardComponent {
     }
   }
 
-  selectStyle() {
-    const c = this.C();
-    return {
-      background: c.BG_CARD,
-      color: c.TEXT,
-      border: `1px solid ${c.BORDER}`,
-      borderRadius: '6px',
-      padding: '6px 10px',
-      fontSize: '13px',
-    };
-  }
-
-  searchStyle() {
-    return { ...this.selectStyle(), flex: '1' };
-  }
-
-  filterBarStyle() {
-    const c = this.C();
-    return { background: c.BG_PANEL, borderColor: c.BORDER };
-  }
-
-  rightPanelStyle() {
-    const c = this.C();
-    return { background: c.BG_PANEL, borderColor: c.BORDER };
+  setDateRange(range: '1h' | '6h' | '24h' | '7d'): void {
+    this.dateRange.set(range);
   }
 
   async onTagClick(tag: TagRecord): Promise<void> {

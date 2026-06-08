@@ -118,9 +118,10 @@ export class PredictionDrawerComponent {
       fontSize: '10px',
       fontWeight: '700',
       letterSpacing: '0.1em',
-      color: c.CYAN,
-      textShadow: c.isDark ? `0 0 6px ${c.CYAN}66` : 'none',
+      color: c.INDIGO ?? c.CYAN,
+      textShadow: c.isDark ? `0 0 6px color-mix(in srgb, ${c.CYAN} 40%, transparent)` : 'none',
       marginBottom: '10px',
+      fontFamily: "'Figtree', system-ui, sans-serif",
     };
   }
 
@@ -138,8 +139,8 @@ export class PredictionDrawerComponent {
     if (!pred) return {};
     const col = this.getRiskColor(pred.risk_class);
     return {
-      background: `${col}0a`,
-      borderColor: `${col}44`,
+      background: `color-mix(in srgb, ${col} 4%, transparent)`,
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
     };
   }
 
@@ -149,8 +150,8 @@ export class PredictionDrawerComponent {
     const col = this.getRiskColor(pred.risk_class);
     return {
       color: col,
-      borderColor: `${col}44`,
-      background: `${col}11`,
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
     };
   }
 
@@ -159,8 +160,8 @@ export class PredictionDrawerComponent {
     const pct = prob * 100;
     const col = this.probabilityColor(pct);
     return {
-      background: `${col}0a`,
-      borderColor: `${col}44`,
+      background: `color-mix(in srgb, ${col} 4%, transparent)`,
+      borderColor: `color-mix(in srgb, ${col} 27%, transparent)`,
       _col: col,
       _pct: pct,
     };
@@ -175,7 +176,7 @@ export class PredictionDrawerComponent {
     return {
       width: `${Math.max(pct, 1)}%`,
       background: col,
-      boxShadow: c.isDark ? `0 0 6px ${col}88` : 'none',
+      boxShadow: c.isDark ? `0 0 6px color-mix(in srgb, ${col} 53%, transparent)` : 'none',
     };
   }
 
@@ -219,7 +220,7 @@ export class PredictionDrawerComponent {
   }
 
   syntheticIdStyle() {
-    return { color: `${this.C().CYAN}88` };
+    return { color: `color-mix(in srgb, ${this.C().CYAN} 53%, transparent)` };
   }
 
   leadTimeFootnote(): string {
