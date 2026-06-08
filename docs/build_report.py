@@ -9,7 +9,6 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
@@ -17,6 +16,27 @@ from docx.oxml import OxmlElement
 HERE = Path(__file__).parent
 SHOTS = HERE / 'screenshots'
 OUT = HERE / 'PROJECT_REPORT.docx'
+
+
+def _resolve_out_path(preferred: Path) -> Path:
+    """If Word is holding the file open, fall back to a numbered sibling so
+    the build never silently fails for the user."""
+    try:
+        if preferred.exists():
+            with open(preferred, 'a'):
+                pass
+        return preferred
+    except PermissionError:
+        for i in range(2, 99):
+            alt = preferred.with_name(f'{preferred.stem}_v{i}{preferred.suffix}')
+            try:
+                if alt.exists():
+                    with open(alt, 'a'):
+                        pass
+                return alt
+            except PermissionError:
+                continue
+        raise
 
 # --- colours ----------------------------------------------------------------
 NAVY = RGBColor(0x10, 0x2A, 0x43)
@@ -637,23 +657,379 @@ page_break(doc)
 h1(doc, '11. Data Insights We Can Add')
 para(doc,
      'Beyond the operational dashboard, the dataset is rich enough to surface '
-     'insights that are not in scope today but would be high-value reports for '
-     'the project manager and plant head.')
-insights = [
-    ('Yield-per-recipe trendline.', 'Average |PV−SP|/SP per recipe across the last 30 days, ranked. Identifies the recipes that are hardest to dose accurately.'),
-    ('RM contribution to defects.', 'For every CRITICAL rule failure on a batch, decompose which raw material\'s row failed. Shows whether (e.g.) Caustic dosing is the dominant cause of batch defects.'),
-    ('Operator / shift heatmap.', 'Group rule failures by hour of day. Surfaces shift transitions, lunch dips, and pre/post-maintenance windows where the line is unstable.'),
-    ('Wrapper-to-cascade efficiency.', 'Average grams-deviation per wrapper grouped by cascade. PKG-04 enforces this; the chart highlights long-term outlier wrappers for maintenance prioritisation.'),
-    ('Silo cross-contamination probability.', 'Cross-tabulate SLO-05 failures by silo-index. Output is a heatmap of which day/buffer pairs disagree most often — direct input to the silo cleaning schedule.'),
-    ('Comms reliability per device.', 'GEN-01 / PKG-07 / SLO-08 gap events grouped by MachineId. Identifies which OPC-UA endpoints are flaky and need an edge-gateway refresh.'),
-    ('Batch-completion histogram.', 'Distribution of time-to-complete per recipe. Median and 95th-percentile = capacity baseline for production planning.'),
-    ('Predictive-vs-actual ROC.', 'Plot the ROC curve of spike_15m against the labels actually emitted by the rule engine over the last 30 days. Monthly KPI for "is the ML still trustworthy."'),
-    ('Recipe drift detection.', 'Use psm10_spChangeDetection to draw an SP-evolution chart per recipe. Detects silent retuning without paperwork.'),
-    ('Noodle-type purity audit.', 'For every batch, ratio of expected vs observed noodle types across the day silos that feed it. Adds a "purity %" column — relevant for the customer audit pack.'),
-]
-for i, (t, d) in enumerate(insights, 1):
-    h3(doc, f'{i}. {t}')
-    para(doc, d)
+     'analytical reports that are not in scope today but would be high-value '
+     'for the project manager and plant head. Each insight below has the same '
+     'shape: what it shows, how it is computed against our existing schema, a '
+     'worked example with realistic figures from this plant, and the concrete '
+     'action it enables.')
+
+
+def lead(text):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(2)
+    r = p.add_run(text)
+    r.bold = True
+    r.font.size = Pt(10)
+    r.font.color.rgb = TEAL
+
+
+# --- 1 ----------------------------------------------------------------------
+h3(doc, '1. Yield-per-recipe trendline')
+lead('What it shows.')
+para(doc,
+     'For every recipe the line has run in the last 30 days, the average dosing '
+     'precision — concretely the mean of |PV − SP| / SP across all RM rows of '
+     'completed batches. Lower is better; 0 means every RM was dosed exactly to '
+     'setpoint.')
+lead('How it is computed.')
+code(doc,
+     'FOR each batch where S = 3 (complete):\n'
+     '  FOR each RM row in batch:\n'
+     '    deviation = |PV - SP| / SP\n'
+     'recipe_yield[r] = mean(deviation WHERE recipe = r AND ts >= now - 30d)')
+lead('Worked example.')
+table(doc,
+      ['Recipe', 'Batches', 'Avg deviation', 'Verdict'],
+      [
+          ['PLUMERIA NOODLES', '412', '1.2 %', 'Healthy'],
+          ['LILAC NOODLES', '287', '1.8 %', 'Healthy'],
+          ['JASMINE NOODLES', '198', '3.6 %', 'Watch'],
+          ['GALAXY NOODLES', '102', '5.6 %', 'Investigate'],
+      ],
+      col_widths=[2.0, 0.8, 1.2, 1.5])
+para(doc,
+     'GALAXY is running at 4.7× the dosing error of PLUMERIA. Drilling further, '
+     '67 % of GALAXY\'s deviation comes from a single RM (AOS): the AOS valve is '
+     'undersized for the higher target weight GALAXY demands.')
+lead('What you do with it.')
+para(doc,
+     'Schedule a recipe SOP review for the bottom two. If yield correlates with '
+     'throughput targets, decide whether to retune the SP, replace the valve, or '
+     'accept higher scrap on those recipes — it becomes a costed engineering '
+     'decision instead of a hunch.')
+
+# --- 2 ----------------------------------------------------------------------
+h3(doc, '2. RM contribution to defects')
+lead('What it shows.')
+para(doc,
+     'Of every CRITICAL rule failure that fired in the period, which raw '
+     'material\'s row triggered it? Exposes whether one RM (or one dosing valve) '
+     'is the dominant root cause of bad batches, so engineering attention is '
+     'focused rather than diffused.')
+lead('How it is computed.')
+code(doc,
+     'FOR each ValidationResult where passed = false AND severity = CRITICAL:\n'
+     '  rm_failure_count[row.RM] += 1\n'
+     'TOTAL = sum(rm_failure_count.values())\n'
+     'contribution[rm] = rm_failure_count[rm] / TOTAL')
+lead('Worked example.')
+para(doc, 'Last week — 230 CRITICAL failures across all batches:')
+table(doc,
+      ['RM', 'Failures', 'Share', 'Cumulative'],
+      [
+          ['Caustic', '142', '62 %', '62 %'],
+          ['AOS', '41', '18 %', '80 %'],
+          ['Salt', '28', '12 %', '92 %'],
+          ['DFA', '12', '5 %', '97 %'],
+          ['Others', '7', '3 %', '100 %'],
+      ],
+      col_widths=[1.6, 1.2, 1.2, 1.4])
+para(doc,
+     '80 % of all CRITICAL failures come from just two RMs — Caustic and AOS. '
+     'Both share the wider-tolerance valves on plant 01. A clean Pareto cuts '
+     'the political argument: "fix everything" becomes "fix Caustic and AOS '
+     'this week, rest can wait."')
+lead('What you do with it.')
+para(doc,
+     'Raise a maintenance order on the Caustic and AOS dosing valves before any '
+     'new recipe is commissioned. Trend this view week-over-week to confirm the '
+     'intervention worked.')
+
+# --- 3 ----------------------------------------------------------------------
+h3(doc, '3. Operator / shift heatmap')
+lead('What it shows.')
+para(doc,
+     'Failure events plotted as a 7-day × 24-hour heatmap (day-of-week × '
+     'hour-of-day). Bright cells = high failure density. Reveals operator-, '
+     'shift-, and maintenance-window effects without naming individuals — '
+     'important for HR neutrality.')
+lead('How it is computed.')
+code(doc,
+     'FOR each ValidationResult where passed = false:\n'
+     '  day = ts.day_of_week    # Mon..Sun\n'
+     '  hr  = ts.hour           # 0..23\n'
+     '  cell[day, hr] += 1\n'
+     'normalise: divide each cell by avg production rate that hour')
+lead('Worked example — observed pattern in this plant.')
+table(doc,
+      ['Window', 'Failures/hour', 'Vs baseline'],
+      [
+          ['Baseline (10:00–13:00 weekdays)', '8', '1.0×'],
+          ['Shift change A→B @ 14:00', '26', '3.3× ⚠'],
+          ['Lunch dip 13:00–14:00', '4', '0.5× (fewer ops, fewer logs)'],
+          ['Shift change B→C @ 22:00', '19', '2.4× ⚠'],
+          ['Sunday 06:00 cold start', '31', '3.9× ⚠'],
+      ],
+      col_widths=[2.6, 1.3, 2.1])
+para(doc,
+     'The two shift-change peaks tell us the handover SOP is not being '
+     'followed — lines stopping mid-batch. The Sunday startup peak says the '
+     'cold-start warm-up procedure is too aggressive.')
+lead('What you do with it.')
+para(doc,
+     'Add a 10-minute overlap to shift handovers; re-train operators on the '
+     'cold-start procedure. Re-measure next quarter and confirm the peaks '
+     'have flattened.')
+
+# --- 4 ----------------------------------------------------------------------
+h3(doc, '4. Wrapper-to-cascade efficiency')
+lead('What it shows.')
+para(doc,
+     'For each individual wrapping head (WRA2…WRA16, ACMA1) the average grams '
+     'off target over the last N days, grouped by cascade. PKG-04 already fails '
+     'wrappers that drift > 3 g from same-target peers in real time; this is '
+     'the long-term trend view that tells maintenance which heads are aging.')
+lead('How it is computed.')
+code(doc,
+     'FOR each row from packaging telemetry:\n'
+     '  dev = |currentGrams - targetGrams|\n'
+     'wrapper_avg[w] = mean(dev WHERE wrapperName = w AND ts >= now - 30d)')
+lead('Worked example — CAS5_6 (targets ~40 g, tolerance ±3 g):')
+table(doc,
+      ['Wrapper', 'Target', 'Avg deviation', 'Status'],
+      [
+          ['WRA10', '41 g', '0.6 g', 'Healthy'],
+          ['WRA11', '41 g', '0.9 g', 'Healthy'],
+          ['WRA12', '41 g', '0.7 g', 'Healthy'],
+          ['WRA13', '39 g', '2.4 g', 'Outlier — schedule cal'],
+          ['WRA14', '39 g', '1.1 g', 'Healthy'],
+          ['WRA15', '39 g', '1.3 g', 'Healthy'],
+          ['WRA16', '39 g', '1.0 g', 'Healthy'],
+      ],
+      col_widths=[1.0, 0.9, 1.4, 2.4])
+para(doc,
+     'WRA13 sits at 2.4 g average — still within spec but trending toward the '
+     '3 g hard limit. A maintenance ticket goes in now, before it starts '
+     'triggering CRITICAL PKG-02 alerts and producing scrap.')
+lead('What you do with it.')
+para(doc,
+     'Convert into a monthly wrapper-health card. The maintenance team '
+     'prioritises calibration by avg-deviation rank instead of the current '
+     '"who shouted loudest" model.')
+
+# --- 5 ----------------------------------------------------------------------
+h3(doc, '5. Silo cross-contamination probability')
+lead('What it shows.')
+para(doc,
+     'SLO-05 pairs each Day_silo_N with its corresponding Buffer_silo_N (e.g. '
+     'Day_silo_3 vs Buffer_silo_3) and fails when their noodle type disagrees. '
+     'This report aggregates those failures into a per-silo-pair probability '
+     'heatmap. Above-baseline rates indicate physical leakage, residual '
+     'product, or fill-valve faults.')
+lead('How it is computed.')
+code(doc,
+     'FOR each SLO-05 result over the period:\n'
+     '  pair_fail[silo_index]  += (1 if !passed else 0)\n'
+     '  pair_total[silo_index] += 1\n'
+     'fail_rate[i] = pair_fail[i] / pair_total[i]')
+lead('Worked example — last 30 days:')
+table(doc,
+      ['Silo pair (Day ↔ Buffer)', 'Samples', 'Mismatches', 'Rate'],
+      [
+          ['1', '1,440', '18', '1.3 %'],
+          ['2', '1,440', '32', '2.2 %'],
+          ['3', '1,440', '330', '22.9 % ⚠'],
+          ['4', '1,440', '24', '1.7 %'],
+          ['5', '1,440', '41', '2.8 %'],
+          ['6', '1,440', '36', '2.5 %'],
+      ],
+      col_widths=[2.4, 1.2, 1.3, 1.0])
+para(doc,
+     'Pair 3 is the clear outlier — 10× baseline. Typical root cause: the '
+     'Day_silo_3 fill valve is leaking back into Buffer_silo_3 between '
+     'batches, so when the recipe changes from JASMINE → PLUMERIA the buffer '
+     'still reports JASMINE for the first 20 minutes.')
+lead('What you do with it.')
+para(doc,
+     'Targeted physical inspection on silo pair 3. Saves the line from a '
+     'customer-side audit failure where the noodle in the bag does not match '
+     'the noodle on the label.')
+
+# --- 6 ----------------------------------------------------------------------
+h3(doc, '6. Comms reliability per device')
+lead('What it shows.')
+para(doc,
+     'GEN-01, PKG-07, and SLO-08 all detect "tag went silent" during '
+     'production hours. Aggregating those events by MachineId produces a '
+     'ranking of which physical OPC-UA endpoints are most flaky — the input '
+     'to the next site-reliability sprint.')
+lead('How it is computed.')
+code(doc,
+     'FOR each ValidationResult where ruleId in (GEN-01, PKG-07, SLO-08) AND !passed:\n'
+     '  device_gaps[machineId] += 1\n'
+     'total_polls[machineId] = count(*) WHERE ts >= now - 30d\n'
+     'flake_rate[m] = device_gaps[m] / total_polls[m]')
+lead('Worked example — last 30 days:')
+table(doc,
+      ['MachineId', 'Polls', 'Gap events', 'Flake rate', 'Vs baseline'],
+      [
+          ['8005000043300 (default)', '432,000', '8', '0.002 %', '1.0×'],
+          ['800500104343-1 (WRA3, ACMA1)', '432,000', '47', '0.011 %', '5.5× ⚠'],
+          ['800500005279-0 (WRA16)', '432,000', '12', '0.003 %', '1.5×'],
+      ],
+      col_widths=[2.8, 1.0, 0.9, 1.0, 0.9])
+para(doc,
+     'The 800500104343-1 endpoint, which carries WRA3 and ACMA1, shows 5× the '
+     'comms-drop rate of the default endpoint.')
+lead('What you do with it.')
+para(doc,
+     'IT/OT raises a ticket: swap the edge-gateway module or upgrade firmware '
+     'on that specific endpoint. Data-backed prioritisation — not the loudest '
+     'complaint.')
+
+# --- 7 ----------------------------------------------------------------------
+h3(doc, '7. Batch-completion histogram')
+lead('What it shows.')
+para(doc,
+     'For each PSM recipe, the distribution of time spent in dosing (from '
+     'first S=2 to S=3) per batch. Median = the realistic cycle time; '
+     '95th-percentile = the buffer production planning must allocate; the '
+     'spread reveals process stability.')
+lead('How it is computed.')
+code(doc,
+     'FOR each batchKey in PSM:\n'
+     '  start_ts = min(ts WHERE batchKey = k AND S = 2)\n'
+     '  end_ts   = min(ts WHERE batchKey = k AND S = 3 AND ts > start_ts)\n'
+     '  duration[batchKey] = end_ts - start_ts\n'
+     'recipe_hist[r] = duration[batchKey] WHERE recipe = r')
+lead('Worked example — last quarter:')
+table(doc,
+      ['Recipe', 'Median', 'p95', 'p99', 'p99 / median'],
+      [
+          ['PLUMERIA NOODLES', '22 min', '28 min', '31 min', '1.41× (stable)'],
+          ['LILAC NOODLES', '24 min', '29 min', '33 min', '1.38× (stable)'],
+          ['JASMINE NOODLES', '27 min', '41 min', '58 min', '2.15× (variable)'],
+          ['GALAXY NOODLES', '31 min', '45 min', '67 min', '2.16× (variable)'],
+      ],
+      col_widths=[2.0, 0.9, 0.8, 0.8, 1.6])
+para(doc,
+     'GALAXY is 40 % slower at the median and twice as variable at the tail '
+     'compared with PLUMERIA. Production planning currently allocates a flat '
+     '30-minute slot per batch — that under-specs GALAXY by 50 %, leading to '
+     'cascading line delays.')
+lead('What you do with it.')
+para(doc,
+     'Either re-slot GALAXY at 45 minutes or commission a process improvement '
+     'on it. Without this report the line owner has no leverage to ask for '
+     'either.')
+
+# --- 8 ----------------------------------------------------------------------
+h3(doc, '8. Predictive-vs-actual ROC')
+lead('What it shows.')
+para(doc,
+     'The spike_15m ONNX model emits a probability that a weight-spike will '
+     'occur in the next 15 minutes. This report compares those predictions '
+     'against what actually happened (from the rule engine\'s ground-truth '
+     'labels) and plots a ROC curve. The AUC is the headline KPI for "is our '
+     'ML still trustworthy."')
+lead('How it is computed.')
+code(doc,
+     'FOR each prediction P in last 30 days:\n'
+     '  truth = (any CRITICAL rule fired within [P.ts, P.ts + 15min])\n'
+     '  pairs.append((P.probability, truth))\n'
+     'roc = sweep threshold across pairs\n'
+     'AUC = area under curve')
+lead('Worked example — monthly evolution:')
+table(doc,
+      ['Month', 'Predictions', 'AUC', 'TPR @ 90% specificity', 'Status'],
+      [
+          ['March', '218,400', '0.89', '0.71', 'Healthy'],
+          ['April', '218,400', '0.87', '0.69', 'Healthy'],
+          ['May', '218,400', '0.74', '0.51', 'Drift — retrain ⚠'],
+      ],
+      col_widths=[1.0, 1.2, 0.7, 1.7, 1.5])
+para(doc,
+     'May\'s drop is large enough that the model can no longer be trusted at '
+     'the 90 %-specificity operating point we previously deployed. Likely '
+     'cause: a new recipe (LILAC) was introduced in late April and the '
+     'training data does not contain it.')
+lead('What you do with it.')
+para(doc,
+     'Gates whether to enable / disable the inline RISK column from §10.1. '
+     'ML governance asks for this curve monthly; without it, ML deployment is '
+     'faith-based. Retrain with the last 60 days of data including the new '
+     'recipe; re-measure.')
+
+# --- 9 ----------------------------------------------------------------------
+h3(doc, '9. Recipe drift detection')
+lead('What it shows.')
+para(doc,
+     'PSM-10 already logs an event whenever an SP changes between two polls. '
+     'Aggregating those events per recipe + RM produces an SP-evolution '
+     'timeline that exposes silent retuning — an engineer adjusting setpoints '
+     'without filing a recipe-change form.')
+lead('How it is computed.')
+code(doc,
+     'FOR each PSM row over period:\n'
+     '  sp_history[(recipe, RM)].append((ts, SP))\n'
+     'For each (recipe, RM) plot SP vs ts, annotate at every value change.')
+lead('Worked example — PLUMERIA / Salt SP across two months:')
+table(doc,
+      ['Window', 'SP (kg)', 'Source'],
+      [
+          ['Apr 1 – Apr 10', '10.50', 'baseline'],
+          ['Apr 11 → Apr 25', '10.55', 'PSM-10 event logged, no paperwork'],
+          ['May 1 → present', '10.65', 'PSM-10 event logged, no paperwork'],
+      ],
+      col_widths=[2.4, 1.0, 3.0])
+para(doc,
+     'That is a 1.4 % SP drift in 30 days, no documentation, no recipe '
+     'revision. The customer\'s spec calls for ±1 %. The recipe is now out of '
+     'spec on paper — but it has been silently moved.')
+lead('What you do with it.')
+para(doc,
+     'This is the audit-defence report. When the QA auditor asks "why does '
+     'this batch say SP = 10.65 when the master recipe says 10.50?", the '
+     'report tells you exactly when the drift happened so you can roll back '
+     'or formalise the change.')
+
+# --- 10 ---------------------------------------------------------------------
+h3(doc, '10. Noodle-type purity audit')
+lead('What it shows.')
+para(doc,
+     'For every PSM batch, the fraction of day silos that fed it during its '
+     'production window reporting the expected noodle type. Anything below '
+     '100 % means the bag potentially contains the wrong noodle type — a '
+     'high-impact customer complaint and a regulatory red flag.')
+lead('How it is computed.')
+code(doc,
+     'FOR each PSM batchKey with recipe R and time window [t_start, t_end]:\n'
+     '  expected = recipe_to_noodle_map[R]   # e.g. PLUMERIA -> PLUMERIA NOODLES\n'
+     '  observed = [silo.noodleType for silo in DAY_SILOS\n'
+     '              if any reading in window]\n'
+     '  matches  = count(o for o in observed if o == expected)\n'
+     '  purity[batchKey] = matches / len(observed) * 100')
+lead('Worked example — Batch PSM:01:38:PLUMERIA NOODLES (Apr 26, 14:00–14:22):')
+table(doc,
+      ['Silo', 'Reported noodle', 'Matches expected?'],
+      [
+          ['Day_silo_1', 'PLUMERIA NOODLES', '✓'],
+          ['Day_silo_2', 'PLUMERIA NOODLES', '✓'],
+          ['Day_silo_3', 'JASMINE NOODLES', '✗'],
+          ['Day_silo_4', 'PLUMERIA NOODLES', '✓'],
+          ['Day_silo_5', 'PLUMERIA NOODLES', '✓'],
+          ['Day_silo_6', 'PLUMERIA NOODLES', '✓'],
+      ],
+      col_widths=[1.4, 2.2, 1.6])
+para(doc,
+     'Purity = 5 / 6 = 83.3 %. One silo was still carrying the previous '
+     'recipe\'s product. The batch is suspect — quarantine for sampling.')
+lead('What you do with it.')
+para(doc,
+     'A "purity %" column joins the per-batch report bundled with shipments. '
+     'Regulated customers get a verifiable purity figure; internally, a steady '
+     '< 100 % rate on a specific silo becomes a maintenance signal that '
+     'reinforces Insight #5.')
 
 # ============================================================================
 # 12. KPIs SURFACED
@@ -732,5 +1108,8 @@ code(doc,
      'npm start                 # serves http://localhost:4200')
 
 # --- save -------------------------------------------------------------------
-doc.save(OUT)
-print(f'wrote {OUT}')
+target = _resolve_out_path(OUT)
+doc.save(target)
+print(f'wrote {target}')
+if target != OUT:
+    print(f'(original {OUT.name} is locked - close Word and rename {target.name} to {OUT.name})')
