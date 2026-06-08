@@ -92,17 +92,30 @@
       <!-- Per-tag entries -->
       <div *ngIf="expanded().has(group.tag)">
         <div *ngFor="let e of group.rows"
-             class="px-4 py-2 flex items-start gap-3 text-xs"
+             class="px-4 py-2 text-xs"
              [ngStyle]="rowStyle()">
-          <span [ngStyle]="severityChip(e.severity)" class="flex-shrink-0">{{ e.severity[0] }}</span>
-          <span [ngStyle]="zoneChip(e.zone)" class="flex-shrink-0">{{ e.zone }}</span>
-          <span class="font-mono font-bold flex-shrink-0" [style.color]="severityColor(e.severity)">
-            {{ e.ruleId }}
-          </span>
-          <span class="flex-1" [style.color]="C().TEXT">{{ e.message }}</span>
-          <span class="font-mono text-[10px] whitespace-nowrap" [style.color]="C().MUTED">
-            {{ fmtTime(e.ts) }}
-          </span>
+          <div class="flex items-center gap-3 mb-1">
+            <span [ngStyle]="severityChip(e.severity)" class="flex-shrink-0">{{ e.severity[0] }}</span>
+            <span [ngStyle]="zoneChip(e.zone)" class="flex-shrink-0">{{ e.zone }}</span>
+            <span class="font-mono font-bold flex-shrink-0" [style.color]="severityColor(e.severity)">
+              {{ e.ruleId }}
+            </span>
+            <span class="flex-1 text-xs" [style.color]="C().MUTED">
+              {{ e.ruleTitle }}
+            </span>
+            <span class="font-mono text-[10px] whitespace-nowrap" [style.color]="C().MUTED">
+              {{ fmtTime(e.ts) }}
+            </span>
+          </div>
+          <div class="pl-12 text-xs" [style.color]="C().TEXT">
+            {{ e.message }}
+          </div>
+          <div *ngIf="e.batchId || e.recipe" class="pl-12 text-[10px] mt-0.5"
+               [style.color]="C().MUTED">
+            <span *ngIf="e.batchId">batch <span class="font-mono">{{ e.batchId }}</span></span>
+            <span *ngIf="e.batchId && e.recipe"> · </span>
+            <span *ngIf="e.recipe">recipe <span class="font-mono">{{ e.recipe }}</span></span>
+          </div>
         </div>
       </div>
     </div>

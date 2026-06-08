@@ -356,7 +356,12 @@ export class ZoneAggregatorService {
     return base;
   }
 
-  /** Invoke the rule engine and record failed rules to the alert log. */
+  /** Invoke the rule engine and record failed rules to the alert log.
+   *  Additionally surfaces a synthetic row-status alert for every row that
+   *  resolved to bucket=CRITICAL or bucket=WARNING, so the drawer always
+   *  shows a "why" entry for every flagged tag — even when no specific
+   *  rule fires (the bucket can come from sigmaStatusFromDev / pkgStatusFromDev
+   *  etc., which derive a status without consulting the validator). */
   private runValidationFor(
     row: RawTagRow,
     parsed: any,
@@ -376,6 +381,9 @@ export class ZoneAggregatorService {
     } catch {
       // Validator failures must not break ingest.
     }
+    // Emit row-status synthetic alert for any visibly bad row, regardless
+    // of whether the rule engine produced a corresponding failure.
+    this.alertLog.recordRowStatus(base);
   }
 
   private sigmaStatusFromDev(s: number | undefined, dev: number | undefined): HealthStatus {
