@@ -224,6 +224,259 @@ def page_break(doc):
     doc.add_page_break()
 
 
+def lead(text):
+    """Bold teal label that introduces the paragraph beneath it."""
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(2)
+    r = p.add_run(text)
+    r.bold = True
+    r.font.size = Pt(10)
+    r.font.color.rgb = TEAL
+
+
+def rule_card(rule_id, title, severity, what, pass_ex, fail_ex, why):
+    """Render one rule's detailed walkthrough."""
+    # Title line: 'GEN-01 — Streaming silence > 5 min'  with severity chip
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(10)
+    p.paragraph_format.space_after = Pt(2)
+    r1 = p.add_run(f'{rule_id}  ')
+    r1.bold = True
+    r1.font.size = Pt(11)
+    r1.font.color.rgb = SLATE
+    r2 = p.add_run(title)
+    r2.bold = True
+    r2.font.size = Pt(11)
+    r2.font.color.rgb = NAVY
+    r3 = p.add_run(f'  [{severity}]')
+    r3.bold = True
+    r3.font.size = Pt(9)
+    if severity == 'CRITICAL':
+        r3.font.color.rgb = CRIT
+    elif severity == 'WARNING':
+        r3.font.color.rgb = WARN
+    else:
+        r3.font.color.rgb = INFO
+
+    def _line(label, text, mono=False):
+        pp = doc.add_paragraph()
+        pp.paragraph_format.space_after = Pt(1)
+        pp.paragraph_format.left_indent = Cm(0.3)
+        ra = pp.add_run(f'{label} ')
+        ra.bold = True
+        ra.font.size = Pt(10)
+        ra.font.color.rgb = TEAL
+        rb = pp.add_run(text)
+        rb.font.size = Pt(10)
+        if mono:
+            rb.font.name = 'Consolas'
+            rb.font.color.rgb = SLATE
+
+    _line('What it checks.', what)
+    _line('Passes when.', pass_ex)
+    _line('Fails when.', fail_ex)
+    _line('Why it matters.', why)
+
+
+# ---------------------------------------------------------------------------
+# Rule walkthrough data
+# ---------------------------------------------------------------------------
+GEN_RULES = [
+    ('GEN-01', 'Streaming silence > 5 min during production hours', 'WARNING',
+     'A tag must keep publishing during production hours (06:00–22:00 IST). Any silence longer than 5 min mid-shift is flagged as a comms drop.',
+     'Reading at 14:32:15, next at 14:33:14 — gap 59 s. OK.',
+     'Reading at 14:32:15, next at 14:42:18 — gap 10 m 3 s during shift. Emits "Streaming stopped 10m3s".',
+     'Silent sensors are the most common pre-failure signal. Catching them within minutes is the difference between a hot fix and a halted line.'),
+    ('GEN-02', 'Null or empty value', 'WARNING',
+     'A row\'s Value must not be null or whitespace. Bag-out idle (a single ",") is exempt because that is a legitimate "no bag in dispenser" state.',
+     'Value = "D:202641,S:3,B:38,..." — OK.',
+     'Value = "" — emits "Null or empty value".',
+     'A null on the wire usually means the PLC tag was unbound or the read failed; the value cannot be trusted by any downstream rule.'),
+    ('GEN-03', 'Timestamps must be monotonically increasing per tag', 'INFO',
+     'Successive readings on the same tag must have non-decreasing timestamps.',
+     'T1 = 14:32:15, T2 = 14:33:14 — OK.',
+     'T1 = 14:33:14, T2 = 14:32:15 — emits "Out-of-order TS".',
+     'Out-of-order timestamps indicate gateway clock skew, message replay, or buffer flushes that distort every downstream time-series calculation.'),
+    ('GEN-04', 'Source metadata sanity', 'INFO',
+     'Every row must have SiteId="LLPL", IotDeviceId="uaq-lakme-hul-iotedge-01", SensorId="opcua".',
+     'All three match — OK.',
+     'SiteId = "HUL" — emits "Unexpected source metadata: SiteId=HUL".',
+     'Catches mis-routed telemetry from another plant or a swapped gateway before it contaminates the dashboard.'),
+]
+
+PSM_RULES = [
+    ('PSM-01', 'Schema must contain all of D, S, B, R, RM, SP, PV', 'CRITICAL',
+     'Every PSM batch string must carry the full seven-field schema.',
+     '"D:202641,S:3,B:38,R:PLUMERIA NOODLES,RM:EDTA,SP:2.0499,PV:2.0850" — OK.',
+     '"D:202641,S:3,B:38,R:PLUMERIA,RM:EDTA,SP:2.0499" — emits "Schema incomplete: PV".',
+     'All downstream PSM rules depend on these fields; a missing field invalidates every analysis run against the row.'),
+    ('PSM-02', 'PV must not be 0 while status = dosing (S=2)', 'CRITICAL',
+     'When status code S = 2 (actively dosing), the process value must register some weight (≥ 0.001 kg).',
+     'S=2, PV=1.45 kg — dosing is visible, OK.',
+     'S=2, PV=0.0 — emits "PV0 while dosing. PV=0".',
+     'A scale reading zero while the dosing valve is open means the flow sensor is stuck or the material is blocked — both stop production.'),
+    ('PSM-03', 'PV must not be negative', 'CRITICAL',
+     'PV must be ≥ 0. Weight is a physical quantity; negative values are impossible.',
+     'PV = 2.085 kg — OK.',
+     'PV = −0.123 — emits "PV is negative (-0.123)".',
+     'Negative weight indicates a tare error or calibration drift; the affected scale is unreliable until recalibrated.'),
+    ('PSM-04', 'PV must not drop > 0.5 kg within the same batch counter', 'WARNING',
+     'Within the same batch counter B, PV must not drop by more than 0.5 kg between consecutive polls. Dosing is monotonic by design.',
+     'B=38, PV history 1.2 → 1.5 → 1.8 kg — monotonic, OK.',
+     'B=38, PV history 2.0 → 1.4 kg — emits "PV dropped within batch 38 (2->1.4)".',
+     'A drop mid-batch means the valve flapped, the tank leaked, or the sensor glitched — all need immediate investigation.'),
+    ('PSM-05', 'Completion deviation |PV−SP|/SP ≤ 5 % when batch is completed', 'WARNING',
+     'At completion (S=3), the dosing error |PV − SP| / SP must be ≤ 5 %.',
+     'S=3, SP=2.05 kg, PV=2.08 kg — 1.7 % deviation, OK.',
+     'S=3, SP=35.74 kg, PV=38.25 kg — 7.0 % — emits "Completion deviation 7.0% > 5%".',
+     '5 % is the per-RM yield tolerance. Anything beyond means the batch is off-spec and may need to be scrapped or reworked.'),
+    ('PSM-06', 'Status code must be 1, 2, or 3', 'WARNING',
+     'Status code S must be exactly 1 (idle), 2 (dosing), or 3 (complete).',
+     'S=2 — OK.',
+     'S=5 — emits "Invalid status code S=5".',
+     'Garbage status codes signal corrupted polls or firmware regressions; the row\'s status cannot be trusted by any subsequent rule.'),
+    ('PSM-07', 'Batch counter sequential or 39→0 wrap', 'WARNING',
+     'Batch counter B should equal previous (same batch), previous + 1 (advance), or wrap from 39 back to 0.',
+     'previousB=38, B=39 — advance, OK. previousB=39, B=0 — wrap, OK.',
+     'previousB=38, B=42 — emits "Non-sequential batch jump 38->42".',
+     'A jump means some polls were lost; the data for the missed batches is permanently unrecoverable.'),
+    ('PSM-08', 'All RMs in current cycle agree on D and R', 'WARNING',
+     'All raw materials being dosed simultaneously must agree on D (date) and R (recipe).',
+     'AOS row D=202641,R=PLUMERIA; Caustic row D=202641,R=PLUMERIA — OK.',
+     'AOS R=PLUMERIA; Caustic R=JASMINE — emits "Recipe/date mismatch across RMs".',
+     'Two RMs reporting different recipes in the same cycle is an orchestration bug; the resulting batch is unusable.'),
+    ('PSM-09', 'Streaming gap inside production hours (PSM-scoped)', 'INFO',
+     'PSM-tag-scoped streaming gap. Same logic as GEN-01 but tagged PSM-09 so it surfaces under the PSM filter.',
+     '60 s gap on a PSM tag — OK.',
+     '10 min gap at 14:00 — emits "Comms gap 10m3s".',
+     'PSM is the most rule-heavy zone; isolating its comms drops helps the PSM engineer triage faster than scanning the global GEN-01 stream.'),
+    ('PSM-10', 'SP-change detection (event log only)', 'INFO',
+     'Logs every change of SP between polls. Always passes — this is an event log, not a failure.',
+     'SP=10.50 → SP=10.50 — silent OK.',
+     'SP=10.50 → SP=10.55 — passes but emits "SP adjusted 10.5->10.55".',
+     'Provides the audit trail for SP changes. This event log is the data source for Insight #9 (Recipe-drift detection in §11).'),
+    ('PSM-11', 'Julian date D within 2 days of system time', 'INFO',
+     'The Julian date D field (YYYYDDD format) must be within 2 days of the system clock.',
+     'System day 41 of 2026; D = "202641" — OK.',
+     'D = "202635" (6 days stale) — emits "D field stale by 6.0d".',
+     'Stale D = PLC clock drift or message replay; alerts the team to a gateway-side problem before stale timestamps corrupt batch trace.'),
+    ('PSM-12', 'Batch_PV_Weight ≈ Σ RM PVs (≤ 2 % deviation)', 'INFO',
+     'The aggregate Batch_PV_Weight should match the sum of the individual RM PVs within 2 % — mass conservation across the dosing skid.',
+     'Batch_PV_Weight=100 kg, Σ RM PV=99.5 kg — 0.5 % off, OK.',
+     'Batch_PV_Weight=100 kg, Σ RM PV=92 kg — 8 % — emits "Batch weight vs RM-sum deviation 8.0%".',
+     'A mass imbalance points to an unaccounted leak, a tare bug, or a missing RM row that the orchestrator forgot to record.'),
+]
+
+SMX_RULES = [
+    ('SMX-02', 'Barcode must be empty/idle marker or pure numeric', 'CRITICAL',
+     'A Sigma barcode value must be empty, the literal "Scan Barcode" (idle marker), or pure numeric digits.',
+     '"Scan Barcode" — OK (idle). "1300326026" — OK (valid scan).',
+     '"ABC123XYZ" — emits "Malformed barcode scan \'ABC123XYZ\'".',
+     'A malformed scan means the operator scanned the wrong label or the scanner misaligned — the batch traceability chain is broken until rescanned.'),
+    ('SMX-03', 'Rework stuck > 0 for > 3 consecutive polls', 'WARNING',
+     'The REWORK tag should sit at 0 in normal flow. A value > 0 for more than 3 consecutive polls indicates the mixer is stuck reworking material.',
+     '0, 0, 5, 0 — one isolated rework event, OK.',
+     '5, 5, 5, 5 (four consecutive non-zero polls) — emits "Rework stuck active for 4 polls (value=5)".',
+     'Persistent rework points to a chronic mixing problem (e.g. lump formation). Material and downtime costs escalate quickly if not caught early.'),
+    ('SMX-04', 'MX1 and MX2 must not dose the same batch counter simultaneously', 'WARNING',
+     'Mixer 1 and Mixer 2 must not both be in status 2 (dosing) with the same batch counter B at the same time.',
+     'MX1: S=2,B=38; MX2: S=2,B=39 — different batches, OK.',
+     'MX1: S=2,B=38; MX2: S=2,B=38 — emits "MX1 & MX2 both dosing same batch 38".',
+     'Two physical mixers feeding into one batch ID is an orchestration bug; material destined for different batches gets cross-contaminated.'),
+    ('SMX-05', 'Recipe must not change mid-batch', 'INFO',
+     'While the batch counter B is unchanged, the recipe R must not change.',
+     'B=38, R=PLUMERIA throughout — OK.',
+     'B=38, R=PLUMERIA, then B=38, R=JASMINE — emits "Recipe changed mid-batch 38".',
+     'Recipe should be locked when the batch starts. A mid-batch change means the orchestrator overwrote R without resetting B — guaranteed bad batch.'),
+]
+
+SLO_RULES = [
+    ('SLO-01', 'Noodle type must be in the valid set', 'CRITICAL',
+     'The noodle type string must be one of: JASMINE, PLUMERIA, SERGIO 56, TEXAS MOD, GALAXY, 20 PKO TULIP, LILAC NOODLES.',
+     '"JASMINE NOODLES" — OK.',
+     '"PLUMARIA NOODLES" (typo) — emits "Unknown noodle type \'PLUMARIA NOODLES\'".',
+     'Catches PLC label corruption or new noodle types that have not been onboarded into the validation set yet — easy to miss otherwise.'),
+    ('SLO-02', 'Bag-out detail must be CSV of 4 fields, or single \',\' for idle', 'CRITICAL',
+     'Bag-out value must be a 4-field CSV (batchId, SP, PV, noodleType), or a single "," meaning "no bag in dispenser".',
+     '"B12345,850,847.2,JASMINE NOODLES" — OK. "," — idle, OK.',
+     '"B12345,850" — only 2 fields — emits "Expected 4 CSV fields, got 2".',
+     'Malformed bag-out CSV breaks every downstream consumer, including the bagging-station HMI that operators read.'),
+    ('SLO-03', 'Bag PV weight ≥ 0', 'CRITICAL',
+     'Bagging scale PV weight must be non-negative.',
+     'PV = 850 kg — OK.',
+     'PV = −50 — emits "Bag PV weight negative (-50)".',
+     'Same physics as PSM-03 but for the bagging scale: a negative reading means the scale needs immediate recalibration.'),
+    ('SLO-04', 'Bag PV within 10 % of SP', 'WARNING',
+     'Bagging deviation tolerance is 10 % — wider than PSM\'s 5 % because bag scales are less precise than dosing scales.',
+     'SP=850, PV=857 — 0.8 % off, OK.',
+     'SP=850, PV=950 — 11.8 % — emits "Bag PV 950kg outside 10% of SP 850kg".',
+     'Catches clear over- or under-fills before the bag reaches packaging and becomes scrap.'),
+    ('SLO-05', 'Day-silo and Buffer-silo at same index agree on noodle type', 'WARNING',
+     'Day_silo_N and Buffer_silo_N (same index) are physically paired and must report the same noodle type.',
+     'Day_silo_3 = "PLUMERIA"; Buffer_silo_3 = "PLUMERIA" — OK.',
+     'Day_silo_3 = "PLUMERIA"; Buffer_silo_3 = "JASMINE" — emits "Day/Buffer silo 3 mismatch".',
+     'A mismatch usually means leak-back between silos or residual product not flushed during change-over — the direct lead-in to a contaminated batch (see Insight #5).'),
+    ('SLO-06', 'Station barcode format (≥ 6 digits) when active', 'WARNING',
+     'When the station barcode is active, the value must be numeric and at least 6 digits long. Empty/short values are treated as idle.',
+     '"1300326026" — OK. "" — "Scanner idle / short value" (INFO).',
+     'Only truly broken active scans fail — non-numeric value while not idle.',
+     'Distinguishes idle scanners from malformed scans without flooding the alert log with false positives.'),
+    ('SLO-07', 'Warehouse barcode valid (weight > 0, count 1–6, noodle in set)', 'WARNING',
+     'Warehouse dosing barcode is CSV `batchId,weight,noodle,count`. Weight must be > 0; count must be 1–6; noodle must be in the valid set.',
+     '"B12345,250.5,JASMINE NOODLES,2" — OK.',
+     '"B12345,-10,JASMINE NOODLES,2" — emits "Invalid dosing barcode: weight=-10".',
+     'Warehouse barcodes flow directly into ERP inventory. Garbage in = wrong stock counts and unexplained variance during the next audit.'),
+    ('SLO-08', 'Silo streaming gap > 5 min (Shreeji exempt)', 'INFO',
+     'Silo-scoped streaming gap > 5 min during production hours. The Shreeji barcode is exempt because it polls legitimately sparsely.',
+     '2 min gap on Day_silo_1 — OK.',
+     '8 min gap on Day_silo_3 at 14:00 — emits "Silo comms gap 8m12s".',
+     'Silo-scoped variant of GEN-01 / PSM-09, with the Shreeji exception that prevents false positives on the slow-polled warehouse scanner.'),
+    ('SLO-09', 'No silo should be the lone source of a unique noodle type', 'INFO',
+     'When ≥ 6 silos are reporting, no single silo should be the sole source of a particular noodle type.',
+     '3 silos report PLUMERIA, 3 silos report JASMINE — each type has multiple silos, OK.',
+     '5 silos report PLUMERIA, only Day_silo_3 reports JASMINE — emits "Day_silo_3 shows unique noodle type \'JASMINE\' — review".',
+     'A lone silo with a unique noodle is almost always mislabeled or carrying leftovers from the previous batch — the second strongest cross-contamination signal after SLO-05.'),
+]
+
+PKG_RULES = [
+    ('PKG-01', 'Grams > 0', 'CRITICAL',
+     'Wrapper grams must be strictly positive.',
+     '41 g — OK.',
+     '0 g — emits "Grams not positive (0)".',
+     'A zero or negative read on a wrapper scale means the wrapper jammed, did not seal, or the scale is faulty.'),
+    ('PKG-02', '|grams − wrapper_target| ≤ 3 g', 'CRITICAL',
+     'Measured grams must be within 3 g of the wrapper\'s target weight (looked up from the WRAPPER_TARGETS table).',
+     'WRA10 target 41 g, actual 42 g — 1 g off, OK.',
+     'WRA10 actual 46 g — 5 g off — emits "WRA10 46g off target 41g by 5g".',
+     'The customer-facing weight spec. Anything outside ±3 g is scrap, rework, or an immediate maintenance call.'),
+    ('PKG-03', 'No sudden jump > 5 g between polls', 'WARNING',
+     'Between two consecutive polls on the same wrapper, the value must not change by more than 5 g.',
+     '41 g → 42 g — OK.',
+     '41 g → 50 g — emits "Sudden 9g jump (41->50)".',
+     'Sudden jumps indicate sensor glitches, wrapper-changeover state-machine bugs, or operator error during reel changes.'),
+    ('PKG-04', 'Same-target peers in cascade within 3 g spread', 'WARNING',
+     'Wrappers in the same cascade sharing the same target weight should all be within 3 g of each other in a snapshot.',
+     'WRA10=41, WRA11=42, WRA12=41 (all target 41) — max spread 1 g, OK.',
+     'WRA10=41, WRA11=46 — 5 g spread — emits "WRA11 (46g) deviates >3g from same-target peers".',
+     'Identical-spec wrappers should produce identical output. An outlier is the earliest sign that one head needs calibration (see Insight #4).'),
+    ('PKG-05', 'MachineId matches WRAPPER_MACHINE_MAP expectation', 'WARNING',
+     'Each wrapper has an expected MachineId. Most use the default 8005000043300; WRA3 and ACMA1 use 800500104343-1; WRA16 uses 800500005279-0.',
+     'WRA3 reports MachineId 800500104343-1 — OK.',
+     'WRA3 reports MachineId 8005000043300 — emits "WRA3 from MachineId 8005000043300, expected 800500104343-1".',
+     'Detects a wrapper being misrouted through the wrong gateway, or a label/firmware drift on an edge device.'),
+    ('PKG-06', 'Value not frozen for > 5 identical consecutive polls', 'WARNING',
+     'A wrapper must not report the same exact grams value for more than 5 consecutive polls — a moving production line cannot produce identical readings.',
+     '41, 42, 41, 41, 42, 41 — varying naturally, OK.',
+     '41, 41, 41, 41, 41, 41 (six identical polls) — emits "Value frozen at 41g for 6 polls".',
+     'Identical readings on a live wrapper = sensor stuck. Without this rule, the line would accept or reject wrappers based on stale data.'),
+    ('PKG-07', 'Wrapper gap > 6 min', 'INFO',
+     'A wrapper streaming gap > 6 min flags. Wrappers typically poll every 2 min, so even 6 min is conservative.',
+     '30 s gap — OK.',
+     '10 min gap — emits "Wrapper gap 10m3s > 6min".',
+     'A wrapper-scoped variant of GEN-01 — flags an offline wrapper, a dropped connection, or a stuck poll loop.'),
+]
+
+
 # --- build ------------------------------------------------------------------
 doc = Document()
 set_default_font(doc)
@@ -399,6 +652,9 @@ table(doc,
       ],
       col_widths=[0.9, 1.0, 4.5],
       severity_col=1)
+h3(doc, 'Walkthrough — General Rules')
+for args in GEN_RULES:
+    rule_card(*args)
 
 h2(doc, '5.2 PSM Rules')
 table(doc,
@@ -419,6 +675,9 @@ table(doc,
       ],
       col_widths=[0.9, 1.0, 4.5],
       severity_col=1)
+h3(doc, 'Walkthrough — PSM Rules')
+for args in PSM_RULES:
+    rule_card(*args)
 
 h2(doc, '5.3 Sigma Rules')
 table(doc,
@@ -431,6 +690,9 @@ table(doc,
       ],
       col_widths=[0.9, 1.0, 4.5],
       severity_col=1)
+h3(doc, 'Walkthrough — Sigma Rules')
+for args in SMX_RULES:
+    rule_card(*args)
 
 h2(doc, '5.4 Silo Rules')
 table(doc,
@@ -448,6 +710,9 @@ table(doc,
       ],
       col_widths=[0.9, 1.0, 4.5],
       severity_col=1)
+h3(doc, 'Walkthrough — Silo Rules')
+for args in SLO_RULES:
+    rule_card(*args)
 
 h2(doc, '5.5 Packaging Rules')
 table(doc,
@@ -463,6 +728,9 @@ table(doc,
       ],
       col_widths=[0.9, 1.0, 4.5],
       severity_col=1)
+h3(doc, 'Walkthrough — Packaging Rules')
+for args in PKG_RULES:
+    rule_card(*args)
 
 h2(doc, '5.6 Status Buckets')
 table(doc,
@@ -662,15 +930,6 @@ para(doc,
      'shape: what it shows, how it is computed against our existing schema, a '
      'worked example with realistic figures from this plant, and the concrete '
      'action it enables.')
-
-
-def lead(text):
-    p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(2)
-    r = p.add_run(text)
-    r.bold = True
-    r.font.size = Pt(10)
-    r.font.color.rgb = TEAL
 
 
 # --- 1 ----------------------------------------------------------------------
