@@ -64,30 +64,70 @@
         <span style="font-size:11px;opacity:0.5;font-weight:normal">({{ dataAvailableCount() }})</span>
       </label>
 
-      <!-- Zone dropdown -->
-      <div class="flex flex-col gap-0.5 flex-shrink-0" *ngIf="zoneOptions().length > 0">
+      <!-- Zone multi-select -->
+      <div class="flex flex-col gap-0.5 flex-shrink-0 relative" *ngIf="zoneOptions().length > 0">
         <span class="text-[11px] font-bold tracking-widest uppercase" [style.color]="C().MUTED">Zone</span>
-        <select [ngStyle]="dropdownStyle()"
-                [ngModel]="selectedZone()"
-                (ngModelChange)="zoneChange.emit($event)">
-          <option value="ALL">All zones</option>
-          <option *ngFor="let z of zoneOptions()" [value]="z.key">
-            {{ z.label }} ({{ z.count }})
-          </option>
-        </select>
+        <button type="button" [ngStyle]="dropdownStyle()" class="text-left flex items-center justify-between gap-2"
+                (click)="zoneMenuOpen.set(!zoneMenuOpen()); statusMenuOpen.set(false)">
+          <span>{{ zoneSelectedLabel() }}</span>
+          <span style="font-size:9px;">▾</span>
+        </button>
+        <ng-container *ngIf="zoneMenuOpen()">
+          <div class="fixed inset-0 z-40" (click)="zoneMenuOpen.set(false)"></div>
+          <div class="absolute z-50 right-0 mt-1 rounded shadow-lg overflow-hidden animate-dropdown"
+               style="top:100%;min-width:200px;"
+               [style.background]="C().BG_CARD"
+               [style.border]="'1px solid ' + C().BORDER">
+            <div class="px-3 py-1.5 flex items-center gap-2 border-b text-[10px] font-bold tracking-widest uppercase"
+                 [style.color]="C().MUTED" [style.border-color]="C().BORDER">
+              <button type="button" (click)="selectAllZones()" [style.color]="C().CYAN" class="hover:underline">SELECT ALL</button>
+              <span [style.color]="C().BORDER">·</span>
+              <button type="button" (click)="clearZones()" [style.color]="C().MUTED" class="hover:underline">CLEAR</button>
+            </div>
+            <label *ngFor="let z of zoneOptions()"
+                   class="flex items-center gap-2 px-3 py-2 cursor-pointer text-xs"
+                   style="user-select:none;"
+                   (mouseenter)="$any($event.currentTarget).style.background=C().BG_HOVER"
+                   (mouseleave)="$any($event.currentTarget).style.background='transparent'">
+              <input type="checkbox" [checked]="isZoneChecked(z.key)" (change)="toggleZone(z.key)" />
+              <span [style.color]="C().TEXT" class="flex-1">{{ z.label }}</span>
+              <span [style.color]="C().MUTED" class="font-mono">{{ z.count }}</span>
+            </label>
+          </div>
+        </ng-container>
       </div>
 
-      <!-- Status dropdown -->
-      <div class="flex flex-col gap-0.5 flex-shrink-0" *ngIf="statusOptions().length > 0">
+      <!-- Status multi-select -->
+      <div class="flex flex-col gap-0.5 flex-shrink-0 relative" *ngIf="statusOptions().length > 0">
         <span class="text-[11px] font-bold tracking-widest uppercase" [style.color]="C().MUTED">Status</span>
-        <select [ngStyle]="dropdownStyle()"
-                [ngModel]="selectedStatus()"
-                (ngModelChange)="statusChange.emit($event)">
-          <option value="ALL">All statuses</option>
-          <option *ngFor="let s of statusOptions()" [value]="s.key">
-            {{ s.label }} ({{ s.count }})
-          </option>
-        </select>
+        <button type="button" [ngStyle]="dropdownStyle()" class="text-left flex items-center justify-between gap-2"
+                (click)="statusMenuOpen.set(!statusMenuOpen()); zoneMenuOpen.set(false)">
+          <span>{{ statusSelectedLabel() }}</span>
+          <span style="font-size:9px;">▾</span>
+        </button>
+        <ng-container *ngIf="statusMenuOpen()">
+          <div class="fixed inset-0 z-40" (click)="statusMenuOpen.set(false)"></div>
+          <div class="absolute z-50 right-0 mt-1 rounded shadow-lg overflow-hidden animate-dropdown"
+               style="top:100%;min-width:200px;"
+               [style.background]="C().BG_CARD"
+               [style.border]="'1px solid ' + C().BORDER">
+            <div class="px-3 py-1.5 flex items-center gap-2 border-b text-[10px] font-bold tracking-widest uppercase"
+                 [style.color]="C().MUTED" [style.border-color]="C().BORDER">
+              <button type="button" (click)="selectAllStatuses()" [style.color]="C().CYAN" class="hover:underline">SELECT ALL</button>
+              <span [style.color]="C().BORDER">·</span>
+              <button type="button" (click)="clearStatuses()" [style.color]="C().MUTED" class="hover:underline">CLEAR</button>
+            </div>
+            <label *ngFor="let s of statusOptions()"
+                   class="flex items-center gap-2 px-3 py-2 cursor-pointer text-xs"
+                   style="user-select:none;"
+                   (mouseenter)="$any($event.currentTarget).style.background=C().BG_HOVER"
+                   (mouseleave)="$any($event.currentTarget).style.background='transparent'">
+              <input type="checkbox" [checked]="isStatusChecked(s.key)" (change)="toggleStatus(s.key)" />
+              <span [style.color]="C().TEXT" class="flex-1">{{ s.label }}</span>
+              <span [style.color]="C().MUTED" class="font-mono">{{ s.count }}</span>
+            </label>
+          </div>
+        </ng-container>
       </div>
 
     </div>

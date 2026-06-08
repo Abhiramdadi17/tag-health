@@ -46,8 +46,13 @@ export class ZonesDashboardComponent implements OnInit {
   readonly zoneOptions = ZONE_OPTIONS;
   readonly statusOptions = STATUS_OPTIONS;
 
-  selectedZone   = signal<ZoneType | 'ALL'>('ALL');
-  selectedStatus = signal<StatusBucket | 'ALL'>('ALL');
+  /** Empty set means "show all". Otherwise only zones in the set pass the filter. */
+  selectedZones   = signal<Set<ZoneType>>(new Set());
+  selectedStatuses = signal<Set<StatusBucket>>(new Set());
+  /** Array views for crossing the @Input boundary (Angular bindings prefer
+   *  arrays over Sets for change-detection equality). */
+  selectedZonesArray    = computed<ZoneType[]>(() => Array.from(this.selectedZones()));
+  selectedStatusesArray = computed<StatusBucket[]>(() => Array.from(this.selectedStatuses()));
   filter = signal<string>('');
   /** When true, only rows with dataAvailable=true are visible. */
   onlyDataAvailable = signal<boolean>(true);
@@ -105,8 +110,8 @@ export class ZonesDashboardComponent implements OnInit {
   }
 
   filteredRows = computed<UnifiedTagRow[]>(() => {
-    const zone   = this.selectedZone();
-    const status = this.selectedStatus();
+    const zones    = this.selectedZones();
+    const statuses = this.selectedStatuses();
     const q = this.filter().toLowerCase().trim();
     const onlyData = this.onlyDataAvailable();
     const zf = this.zoneFilters();
@@ -114,8 +119,8 @@ export class ZonesDashboardComponent implements OnInit {
     const toMs   = this.parseDateEnd(this.dateTo());
 
     return this.allRows().filter(r => {
-      if (zone   !== 'ALL' && r.zone   !== zone)   return false;
-      if (status !== 'ALL' && r.bucket !== status) return false;
+      if (zones.size    > 0 && !zones.has(r.zone))      return false;
+      if (statuses.size > 0 && !statuses.has(r.bucket)) return false;
       if (onlyData && !r.dataAvailable) return false;
       // Date range (only enforced when a tsUtc was parseable; PSM rows with empty
       // batch_start_ts get tsUtc=0 and are excluded only when both bounds are set).
@@ -210,12 +215,12 @@ export class ZonesDashboardComponent implements OnInit {
   });
 
   isZoneOn(zone: ZoneType): boolean {
-    const z = this.selectedZone();
-    return z === 'ALL' || z === zone;
+    const z = this.selectedZones();
+    return z.size === 0 || z.has(zone);
   }
   isStatusOn(status: StatusBucket): boolean {
-    const s = this.selectedStatus();
-    return s === 'ALL' || s === status;
+    const s = this.selectedStatuses();
+    return s.size === 0 || s.has(status);
   }
 
   async ngOnInit(): Promise<void> {
@@ -227,12 +232,13 @@ export class ZonesDashboardComponent implements OnInit {
     this.allRows.set(rows);
   }
 
-  setZone(value: string): void {
-    this.selectedZone.set(value as ZoneType | 'ALL');
+  /** Replace the entire selected-zone set (sent as an array over the input boundary). */
+  setZones(values: ZoneType[]): void {
+    this.selectedZones.set(new Set(values));
   }
 
-  setStatus(value: string): void {
-    this.selectedStatus.set(value as StatusBucket | 'ALL');
+  setStatuses(values: StatusBucket[]): void {
+    this.selectedStatuses.set(new Set(values));
   }
 
   handleFilterChange(ev: ZoneFilterEvent): void {

@@ -58,13 +58,52 @@ export class UnifiedTagsTableComponent {
   batchHealth  = input.required<Map<string, BatchHealth>>();
   rowClick     = output<UnifiedTagRow>();
 
-  // Zone / status dropdowns shown in the title bar
-  zoneOptions   = input<ZoneOption[]>([]);
-  statusOptions = input<StatusOption[]>([]);
-  selectedZone  = input<string>('ALL');
-  selectedStatus = input<string>('ALL');
-  zoneChange   = output<string>();
-  statusChange = output<string>();
+  // Zone / status dropdowns shown in the title bar — multi-select. Empty array = "all".
+  zoneOptions    = input<ZoneOption[]>([]);
+  statusOptions  = input<StatusOption[]>([]);
+  selectedZones    = input<ZoneType[]>([]);
+  selectedStatuses = input<StatusBucket[]>([]);
+  zonesChange    = output<ZoneType[]>();
+  statusesChange = output<StatusBucket[]>();
+
+  // Dropdown-open signals for the two multi-select popovers
+  zoneMenuOpen   = signal<boolean>(false);
+  statusMenuOpen = signal<boolean>(false);
+
+  /** Comma-separated label for the zone trigger button. */
+  zoneSelectedLabel = computed(() => {
+    const s = this.selectedZones();
+    if (s.length === 0) return 'All zones';
+    if (s.length === 1) return this.zoneOptions().find(o => o.key === s[0])?.label ?? s[0];
+    if (s.length <= 2) return s.map(k => this.zoneOptions().find(o => o.key === k)?.label ?? k).join(', ');
+    return `${s.length} zones`;
+  });
+
+  statusSelectedLabel = computed(() => {
+    const s = this.selectedStatuses();
+    if (s.length === 0) return 'All statuses';
+    if (s.length <= 2) return s.map(k => this.statusOptions().find(o => o.key === k)?.label ?? k).join(', ');
+    return `${s.length} statuses`;
+  });
+
+  toggleZone(z: ZoneType): void {
+    const cur = new Set(this.selectedZones());
+    if (cur.has(z)) cur.delete(z);
+    else cur.add(z);
+    this.zonesChange.emit(Array.from(cur));
+  }
+  toggleStatus(s: StatusBucket): void {
+    const cur = new Set(this.selectedStatuses());
+    if (cur.has(s)) cur.delete(s);
+    else cur.add(s);
+    this.statusesChange.emit(Array.from(cur));
+  }
+  selectAllZones(): void { this.zonesChange.emit(this.zoneOptions().map(o => o.key)); }
+  clearZones(): void     { this.zonesChange.emit([]); }
+  selectAllStatuses(): void { this.statusesChange.emit(this.statusOptions().map(o => o.key)); }
+  clearStatuses(): void     { this.statusesChange.emit([]); }
+  isZoneChecked(z: ZoneType): boolean       { return this.selectedZones().includes(z); }
+  isStatusChecked(s: StatusBucket): boolean { return this.selectedStatuses().includes(s); }
 
   // Data-available toggle
   onlyDataAvailable    = input<boolean>(false);
@@ -107,10 +146,16 @@ export class UnifiedTagsTableComponent {
   openAlertLog     = output<void>();
   exportCsv        = output<void>();
 
-  psmVisible     = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'PSM');
-  sigmaVisible   = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'SIGMA');
-  siloVisible    = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'SILO');
-  pkgVisible     = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'PACKAGING');
+  /** Zone-filter cards mirror the multi-select: visible when no zones are
+   *  selected (= "all"), or when the specific zone is included in the selection. */
+  private zoneIncluded(z: ZoneType): boolean {
+    const s = this.selectedZones();
+    return s.length === 0 || s.includes(z);
+  }
+  psmVisible     = computed(() => this.zoneIncluded('PSM'));
+  sigmaVisible   = computed(() => this.zoneIncluded('SIGMA'));
+  siloVisible    = computed(() => this.zoneIncluded('SILO'));
+  pkgVisible     = computed(() => this.zoneIncluded('PACKAGING'));
   anyZoneVisible = computed(() => this.psmVisible() || this.sigmaVisible() || this.siloVisible() || this.pkgVisible());
 
   readonly columns = COLUMNS;
