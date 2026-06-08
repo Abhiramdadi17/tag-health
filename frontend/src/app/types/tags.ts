@@ -30,28 +30,50 @@ export interface PsmParsed {
 }
 
 // ---- Sigma Mixer ------------------------------------------------------------
+/** Mixer identity across all six cascades. */
+export type SigmaMixer = 'MX1' | 'MX2' | 'MX3' | 'MX4' | 'MX5' | 'MX6';
+
+/** Raw materials seen across the live Sigma cascades.
+ *  Note: the historian has both 'GLYCERINE' and 'Glycrine' spellings —
+ *  validation accepts either. */
+export const SIGMA_RAW_MATERIALS = [
+  'Colour', 'DTP', 'GLYCERINE', 'Glycrine', 'LIQUID', 'Lauric', 'Liquid',
+  'Noodle', 'PAS', 'Perfume', 'Powder', 'ST', 'STARCH',
+] as const;
+
+/** Recognised rework codes seen in the historian. */
+export const SIGMA_REWORK_CODES = [0, 30] as const;
+
 export interface SigmaParsed {
   kind: 'SIGMA';
   D: string;
   S: StatusCode;
   B: number;
   R: string;        // recipe code e.g. 'LMST5R5_LBGRMEXP+_600KG'
-  RM: string;       // 'Lauric'
+  RM: string;       // e.g. 'Lauric', 'PAS', 'Glycrine', 'Colour', ...
   SP: number;
   PV: number;
 }
 
 export interface SigmaBarcode {
   kind: 'SIGMA_BARCODE';
-  mixer: 'MX1' | 'MX2';
+  mixer: SigmaMixer;
   barcodeValue: string;
   isIdle: boolean;  // true when value === 'Scan Barcode'
 }
 
 export interface SigmaRework {
   kind: 'SIGMA_REWORK';
-  mixer: 'MX1' | 'MX2';
+  mixer: SigmaMixer;
   reworkValue: number; // 0 = normal, > 0 = rework active
+}
+
+/** Sigma structural tags (RECIPE_NAME, BATCHCOUNTER) — analogous to PSM_TELEMETRY. */
+export interface SigmaTelemetryParsed {
+  kind: 'SIGMA_TELEMETRY';
+  mixer: SigmaMixer;
+  tagType: 'BATCHCOUNTER' | 'RECIPE_NAME';
+  value: number | string;
 }
 
 // ---- Silo -------------------------------------------------------------------
@@ -135,6 +157,7 @@ export type ParsedTagValue =
   | PsmTelemetryParsed
   | SigmaParsed
   | SigmaBarcode
+  | SigmaTelemetryParsed
   | SigmaRework
   | SiloParsed
   | PackagingParsed
@@ -223,6 +246,8 @@ export interface TagState {
   previousR: string | null;
   consecutiveIdenticalCount: number;
   consecutiveNonZeroReworkCount: number;
+  /** Timestamps of non-zero rework events in the rolling 60-min window. SMX-15. */
+  reworkEvents?: Date[];
 }
 
 // ---- Zone snapshots ---------------------------------------------------------

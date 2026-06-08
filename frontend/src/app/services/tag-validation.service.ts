@@ -42,19 +42,39 @@ export class TagValidationService {
       case 'PSM':
         results.push(...this.runPsmRules(row, parsed, state, ts, context));
         break;
-      case 'SIGMA':
-        results.push(...this.runPsmRules(row, parsed as unknown as PsmParsed, state, ts, context));
+      case 'SIGMA': {
+        // The 12 PSM rules also apply to Sigma rows — relabel PSM-XX → SMX-XX
+        // so they surface under the Sigma filter and ruleId space.
+        const mirrored = this.runPsmRules(row, parsed as unknown as PsmParsed, state, ts, context);
+        for (const r of mirrored) {
+          r.ruleId = r.ruleId.replace(/^PSM-/, 'SMX-');
+        }
+        results.push(...mirrored);
         results.push(...this.runSigmaExtra(parsed, state, context));
         break;
+      }
       case 'SIGMA_BARCODE':
-        results.push(this.smx02_barcodeState(parsed.barcodeValue));
+        results.push(this.smx18_barcodeState(parsed.barcodeValue));
         break;
       case 'SIGMA_REWORK': {
-        const count = parsed.reworkValue > 0 ? state.consecutiveNonZeroReworkCount + 1 : 0;
-        state.consecutiveNonZeroReworkCount = count;
-        results.push(this.smx03_reworkFlag(parsed.reworkValue, count));
+        const consec = parsed.reworkValue > 0 ? state.consecutiveNonZeroReworkCount + 1 : 0;
+        state.consecutiveNonZeroReworkCount = consec;
+        // Maintain rolling 60-min window of non-zero rework events for SMX-15.
+        const now = ts ?? new Date();
+        const events = (state.reworkEvents ?? []).filter(
+          d => now.getTime() - d.getTime() < 3_600_000,
+        );
+        if (parsed.reworkValue > 0) events.push(now);
+        state.reworkEvents = events;
+
+        results.push(this.smx13_reworkStuck(parsed.reworkValue, consec));
+        results.push(this.smx14_reworkValuePlausibility(parsed.reworkValue));
+        results.push(this.smx15_reworkRateLimit(events.length));
         break;
       }
+      case 'SIGMA_TELEMETRY':
+        // Structural mixer-state labels — only general rules apply.
+        break;
       case 'SILO':
         results.push(...this.runSiloRules(row, parsed, ts, state, context));
         break;
@@ -151,29 +171,57 @@ export class TagValidationService {
     return dev > 0.02 ? fail('PSM-12', 'INFO', `Batch weight vs RM-sum deviation ${(dev * 100).toFixed(1)}%`) : ok('PSM-12', 'INFO');
   }
 
+  // --- Sigma-specific rules (after the SMX-01..SMX-12 mirror block) ---------
+  // Numbering convention:
+  //   SMX-01..SMX-12  mirror PSM-01..PSM-12 (applied via prefix relabel)
+  //   SMX-13..SMX-15  rework rules
+  //   SMX-16..SMX-17  orchestration rules (parallel dosing, recipe mid-batch)
+  //   SMX-18          legacy barcode rule (fires only when a SIGMA_BARCODE row exists)
+
   private runSigmaExtra(p: SigmaParsed, state: TagState, ctx: any): ValidationResult[] {
-    const res: ValidationResult[] = [this.smx05_recipeConsistency(p, state.previousR, state.previousB)];
-    if (ctx.mx1 && ctx.mx2) res.push(this.smx04_simultaneousSameBatch(ctx.mx1, ctx.mx2));
+    const res: ValidationResult[] = [this.smx17_recipeConsistency(p, state.previousR, state.previousB)];
+    if (ctx.mx1 && ctx.mx2) res.push(this.smx16_simultaneousSameBatch(ctx.mx1, ctx.mx2));
     return res;
   }
-  smx02_barcodeState(barcodeValue: string): ValidationResult {
+
+  smx13_reworkStuck(reworkValue: number, consecutiveNonZeroCount: number): ValidationResult {
+    if (reworkValue > 0 && consecutiveNonZeroCount > 3) {
+      return fail('SMX-13', 'WARNING',
+        `Rework stuck active for ${consecutiveNonZeroCount} polls (value=${reworkValue})`);
+    }
+    return ok('SMX-13', 'WARNING');
+  }
+  smx14_reworkValuePlausibility(reworkValue: number): ValidationResult {
+    if (isNaN(reworkValue) || reworkValue === 0 || reworkValue === 30) {
+      return ok('SMX-14', 'WARNING');
+    }
+    return fail('SMX-14', 'WARNING',
+      `Unrecognised rework code ${reworkValue} (expected 0 or 30)`);
+  }
+  smx15_reworkRateLimit(eventsLastHour: number): ValidationResult {
+    if (eventsLastHour > 5) {
+      return fail('SMX-15', 'WARNING',
+        `${eventsLastHour} rework events in last 60 min — chronic rework`);
+    }
+    return ok('SMX-15', 'WARNING');
+  }
+  smx16_simultaneousSameBatch(mx1: SigmaParsed, mx2: SigmaParsed): ValidationResult {
+    if (mx1.S === 2 && mx2.S === 2 && mx1.B === mx2.B) {
+      return fail('SMX-16', 'WARNING', `MX1 & MX2 both dosing same batch ${mx1.B}`);
+    }
+    return ok('SMX-16', 'WARNING');
+  }
+  smx17_recipeConsistency(p: SigmaParsed, previousR: string | null, previousB: number | null): ValidationResult {
+    if (previousR != null && previousB != null && previousB === p.B && previousR !== p.R) return fail('SMX-17', 'INFO', `Recipe changed mid-batch ${p.B}`);
+    return ok('SMX-17', 'INFO');
+  }
+
+  smx18_barcodeState(barcodeValue: string): ValidationResult {
     const v = (barcodeValue ?? '').trim();
-    if (v === '') return fail('SMX-02', 'CRITICAL', 'Empty/null barcode');
-    if (v.toLowerCase() === 'scan barcode') return ok('SMX-02', 'CRITICAL', 'Idle (Scan Barcode)');
-    if (/^\d+$/.test(v)) return ok('SMX-02', 'CRITICAL', `Valid scan #${v}`);
-    return fail('SMX-02', 'CRITICAL', `Malformed barcode scan '${v}'`);
-  }
-  smx03_reworkFlag(reworkValue: number, consecutiveNonZeroCount: number): ValidationResult {
-    if (reworkValue > 0 && consecutiveNonZeroCount > 3) return fail('SMX-03', 'WARNING', `Rework stuck active for ${consecutiveNonZeroCount} polls (value=${reworkValue})`);
-    return ok('SMX-03', 'WARNING');
-  }
-  smx04_simultaneousSameBatch(mx1: SigmaParsed, mx2: SigmaParsed): ValidationResult {
-    if (mx1.S === 2 && mx2.S === 2 && mx1.B === mx2.B) return fail('SMX-04', 'WARNING', `MX1 & MX2 both dosing same batch ${mx1.B}`);
-    return ok('SMX-04', 'WARNING');
-  }
-  smx05_recipeConsistency(p: SigmaParsed, previousR: string | null, previousB: number | null): ValidationResult {
-    if (previousR != null && previousB != null && previousB === p.B && previousR !== p.R) return fail('SMX-05', 'INFO', `Recipe changed mid-batch ${p.B}`);
-    return ok('SMX-05', 'INFO');
+    if (v === '') return fail('SMX-18', 'CRITICAL', 'Empty/null barcode');
+    if (v.toLowerCase() === 'scan barcode') return ok('SMX-18', 'CRITICAL', 'Idle (Scan Barcode)');
+    if (/^\d+$/.test(v)) return ok('SMX-18', 'CRITICAL', `Valid scan #${v}`);
+    return fail('SMX-18', 'CRITICAL', `Malformed barcode scan '${v}'`);
   }
 
   private runSiloRules(row: RawTagRow, p: any, ts: Date | null, state: TagState, ctx: any): ValidationResult[] {

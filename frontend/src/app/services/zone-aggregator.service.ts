@@ -182,18 +182,18 @@ export class ZoneAggregatorService {
     };
 
     if (zone === 'SIGMA' && p.kind === 'SIGMA') {
-      base.subtype = 'BATCH';
+      // RM becomes the subtype so the Sigma "Tag Type" filter mirrors PSM.
+      base.subtype = p.RM || 'BATCH';
       base.recipe = p.R; base.rm = p.RM; base.batchId = String(p.B);
       base.sp = isFinite(p.SP) ? p.SP : undefined;
       base.pv = isFinite(p.PV) ? p.PV : undefined;
       base.dev = base.sp != null && base.sp > 0 && base.pv != null
         ? ((base.pv - base.sp) / base.sp) * 100
         : undefined;
-      const mixer = r.Tag.includes('MIXER_2') ? 'MX2' : 'MX1';
-      base.batchKey = `SIGMA:${mixer}:${p.B}`;
+      const mixer = this.parser.sigmaMixerOf(r.Tag);
+      // Mirror PSM batchKey shape: SIGMA:<mixer>:<batchCounter>:<recipe>
+      base.batchKey = `SIGMA:${mixer}:${p.B}:${p.R}`;
       base.status = this.sigmaStatusFromDev(p.S, base.dev);
-      // Rich data only when this batch actually carries a non-zero setpoint.
-      // The training data has rows like `SP:0.0,,PV:0.0` which are placeholders.
       base.dataAvailable = base.sp != null && base.sp > 0;
     } else if (zone === 'SIGMA' && p.kind === 'SIGMA_BARCODE') {
       base.subtype = 'BARCODE';
@@ -205,8 +205,19 @@ export class ZoneAggregatorService {
       base.status = p.reworkValue > 0 ? 'WARNING' : 'NORMAL';
       base.pv = p.reworkValue;
       base.batchKey = `SIGMA:${p.mixer}:REWORK`;
-      // Rework=0 is the steady-state idle; only flag rework events as rich.
       base.dataAvailable = p.reworkValue > 0;
+    } else if (zone === 'SIGMA' && p.kind === 'SIGMA_TELEMETRY') {
+      base.subtype = p.tagType;
+      base.latestValue = String(p.value);
+      base.batchKey = `SIGMA:${p.mixer}:TELEMETRY`;
+      base.status = 'OK';
+      if (p.tagType === 'BATCHCOUNTER') {
+        base.batchId = String(p.value);
+      } else if (p.tagType === 'RECIPE_NAME') {
+        base.recipe = String(p.value);
+      }
+      // Structural labels are not rule-checked — kept out of the health score.
+      base.dataAvailable = false;
     } else if (zone === 'SILO' && p.kind === 'SILO') {
       base.subtype = p.tagType;
       if (p.tagType === 'noodle_type') {

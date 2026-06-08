@@ -16,3 +16,4 @@ appsettings.Local.json
 # OS artefacts
 .DS_Store
 Thumbs.db
+~$*

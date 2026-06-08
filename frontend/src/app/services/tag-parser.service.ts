@@ -8,6 +8,8 @@ import {
   SigmaParsed,
   SigmaBarcode,
   SigmaRework,
+  SigmaTelemetryParsed,
+  SigmaMixer,
   SiloParsed,
   PackagingParsed,
   StatusCode,
@@ -27,13 +29,22 @@ export class TagParserService {
   // --------------------------------------------------------------------------
   detectTagType(tagName: string): TagType {
     const t = tagName || '';
-    if (t.includes('PSM') || t.includes('Psm')) return 'PSM';
-    if (t.includes('MIXER') || t.includes('SM_MX') || t.includes('MX0')) return 'SIGMA';
+    const lower = t.toLowerCase();
+    // SILO first — silo tags can carry a 'Cascade<n>.' OPC-UA path prefix.
     if (
-      t.includes('silo') || t.includes('Silo') || t.includes('Bagout') ||
+      lower.includes('silo') || t.includes('Bagout') ||
       t.includes('Scnr_barcode') || t.includes('Dosing_Barcode') || t.includes('Shreeji')
     ) return 'SILO';
+    // SIGMA — covers the new Cascade<n>_ rooted tags + classic MIXER patterns.
+    // Must precede PSM because a few Sigma rows ('Cascade 2_PSM_batch_…') carry
+    // 'PSM' as a substring even though they belong to Sigma.
+    if (
+      t.includes('Sigmamixer') || t.includes('SigmaMixer') ||
+      t.includes('MIXER') || t.includes('SM_MX') || t.includes('MX0') ||
+      /Cascade\s*\d/.test(t)
+    ) return 'SIGMA';
     if (t.includes('SOAP_GRAM') || t.includes('ACMA1')) return 'PACKAGING';
+    if (t.includes('PSM') || t.includes('Psm')) return 'PSM';
     return 'UNKNOWN';
   }
 
@@ -120,12 +131,18 @@ export class TagParserService {
   }
 
   // --------------------------------------------------------------------------
-  // Sigma sub-types: LAURIC_STRING (batch), SM_MX#_BC (barcode), REWORK (int)
+  // Sigma sub-types:
+  //   batch string  D:S:B:R:RM:SP:PV   (the dominant case in the new workbook)
+  //   REWORK        scalar int
+  //   BATCHCOUNTER  scalar int — structural mixer-state tag
+  //   RECIPE_NAME   string     — structural mixer-state tag
+  //   SM_MX#_BC     numeric barcode (legacy)
   // --------------------------------------------------------------------------
   private parseSigmaTag(tagName: string, raw: string | number): ParsedTagValue {
+    const short = tagName.split('.').pop() ?? tagName;
     const mixer = this.sigmaMixerOf(tagName);
 
-    if (tagName.includes('REWORK')) {
+    if (/REWORK/i.test(short) || /Rework/.test(short)) {
       return {
         kind: 'SIGMA_REWORK',
         mixer,
@@ -133,15 +150,28 @@ export class TagParserService {
       } as SigmaRework;
     }
 
+    if (/BATCHCOUNTER/i.test(short)) {
+      return {
+        kind: 'SIGMA_TELEMETRY',
+        mixer,
+        tagType: 'BATCHCOUNTER',
+        value: this.toNumber(raw),
+      } as SigmaTelemetryParsed;
+    }
+
+    if (/RECIPE[_ ]?NAME/i.test(short)) {
+      return {
+        kind: 'SIGMA_TELEMETRY',
+        mixer,
+        tagType: 'RECIPE_NAME',
+        value: String(raw ?? '').trim(),
+      } as SigmaTelemetryParsed;
+    }
+
     if (tagName.includes('SM_MX') || tagName.includes('_BC')) {
       const val = String(raw ?? '').trim();
-      // 'Scan Barcode' (literal), empty cell, or pandas/NaN spelling all mean
-      // the scanner is idle. Otherwise val is a numeric barcode string.
       const lower = val.toLowerCase();
-      const isIdle =
-        val === '' ||
-        lower === 'scan barcode' ||
-        lower === 'nan';
+      const isIdle = val === '' || lower === 'scan barcode' || lower === 'nan';
       return {
         kind: 'SIGMA_BARCODE',
         mixer,
@@ -150,13 +180,22 @@ export class TagParserService {
       } as SigmaBarcode;
     }
 
-    // LAURIC_STRING batch string
+    // Batch string D:S:B:R:RM:SP:PV — the dominant case.
     const parsed = this.parseBatchString(String(raw), 'SIGMA');
     return parsed ?? { kind: 'UNKNOWN', raw };
   }
 
-  private sigmaMixerOf(tagName: string): 'MX1' | 'MX2' {
-    if (tagName.includes('MIXER_2') || tagName.includes('MX2') || tagName.includes('MX02')) return 'MX2';
+  /** Derive the mixer identity (MX1..MX6) from any known tag shape:
+   *   - explicit 'MX<n>' / 'MX0<n>'
+   *   - 'MIX<n>' / 'MIXER<n>' / 'MIXER_<n>'
+   *   - 'Cascade<n>' (cascades map 1:1 to mixers in the current plant) */
+  sigmaMixerOf(tagName: string): SigmaMixer {
+    const direct = tagName.match(/(?:^|[^A-Za-z])MX0?([1-6])(?![0-9])/);
+    if (direct) return (`MX${direct[1]}`) as SigmaMixer;
+    const mix = tagName.match(/MIX(?:ER)?_?([1-6])(?![0-9])/);
+    if (mix) return (`MX${mix[1]}`) as SigmaMixer;
+    const cascade = tagName.match(/Cascade\s*([1-6])(?![0-9])/);
+    if (cascade) return (`MX${cascade[1]}`) as SigmaMixer;
     return 'MX1';
   }
 
