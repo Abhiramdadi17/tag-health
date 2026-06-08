@@ -87,12 +87,12 @@ export interface SiloNoodleType {
 export interface SiloBagOut {
   kind: 'SILO';
   tagType: 'bagout_detail';
-  stationId: string;  // 'Stn_01' | 'Stn_02'
+  stationId: string;       // 'Stn_01' | 'Stn_02'
   batchId: string;
-  SP: number;
-  PV: number;
+  upperLimit: number;      // bag acceptance window — upper bound (kg)
+  lowerLimit: number;      // bag acceptance window — lower bound (kg)
   noodleType: string;
-  isIdle: boolean;    // true when value === ','
+  isIdle: boolean;         // true when value === ','
 }
 
 export interface SiloBarcodeTag {
@@ -164,7 +164,10 @@ export type ParsedTagValue =
   | UnknownParsed;
 
 // ---- Unified view -----------------------------------------------------------
-export type ZoneType = 'PSM' | 'SIGMA' | 'SILO' | 'PACKAGING';
+/** BARCODE is a virtual zone: it aggregates every barcode/scan-style tag
+ *  (station, warehouse-dosing, Shreeji, legacy Sigma) into one filterable
+ *  surface so traceability data is not spread across SILO and SIGMA. */
+export type ZoneType = 'PSM' | 'SIGMA' | 'SILO' | 'BARCODE' | 'PACKAGING';
 
 /** All possible health/state labels surfaced in the unified table. */
 export type HealthStatus =
@@ -211,6 +214,9 @@ export interface UnifiedTagRow {
   tsUtc: number;
   /** PSM only: last 10 PV readings (most-recent last). Used for history chart. */
   last10?: number[];
+  /** Silo bag-out only: acceptance window upper/lower bounds (kg). */
+  upperLimit?: number;
+  lowerLimit?: number;
 }
 
 export interface BatchHealth {

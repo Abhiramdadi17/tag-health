@@ -405,47 +405,65 @@ SLO_RULES = [
      'The noodle type string must be one of: JASMINE, PLUMERIA, SERGIO 56, TEXAS MOD, GALAXY, 20 PKO TULIP, LILAC NOODLES.',
      '"JASMINE NOODLES" — OK.',
      '"PLUMARIA NOODLES" (typo) — emits "Unknown noodle type \'PLUMARIA NOODLES\'".',
-     'Catches PLC label corruption or new noodle types that have not been onboarded into the validation set yet — easy to miss otherwise.'),
+     'Catches PLC label corruption or new noodle types that have not been onboarded into the validation set yet.'),
     ('SLO-02', 'Bag-out detail must be CSV of 4 fields, or single \',\' for idle', 'CRITICAL',
-     'Bag-out value must be a 4-field CSV (batchId, SP, PV, noodleType), or a single "," meaning "no bag in dispenser".',
+     'Bag-out value must be a 4-field CSV (batchId, upperLimit, lowerLimit, noodleType), or a single "," meaning "no bag in dispenser".',
      '"B12345,850,847.2,JASMINE NOODLES" — OK. "," — idle, OK.',
      '"B12345,850" — only 2 fields — emits "Expected 4 CSV fields, got 2".',
      'Malformed bag-out CSV breaks every downstream consumer, including the bagging-station HMI that operators read.'),
-    ('SLO-03', 'Bag PV weight ≥ 0', 'CRITICAL',
-     'Bagging scale PV weight must be non-negative.',
-     'PV = 850 kg — OK.',
-     'PV = −50 — emits "Bag PV weight negative (-50)".',
-     'Same physics as PSM-03 but for the bagging scale: a negative reading means the scale needs immediate recalibration.'),
-    ('SLO-04', 'Bag PV within 10 % of SP', 'WARNING',
-     'Bagging deviation tolerance is 10 % — wider than PSM\'s 5 % because bag scales are less precise than dosing scales.',
-     'SP=850, PV=857 — 0.8 % off, OK.',
-     'SP=850, PV=950 — 11.8 % — emits "Bag PV 950kg outside 10% of SP 850kg".',
-     'Catches clear over- or under-fills before the bag reaches packaging and becomes scrap.'),
+    ('SLO-03', 'Bag-out lower limit > 0', 'CRITICAL',
+     'The lower acceptance limit on a bag must be strictly positive — a zero or negative lower bound would accept empty bags.',
+     'lowerLimit = 847.2 — OK.',
+     'lowerLimit = 0 or −50 — emits "Bag-out lower limit not positive (0)".',
+     'Catches a corrupted limit configuration that would silently disable the bag-weight check.'),
+    ('SLO-04', 'Upper limit > lower limit, and window ≤ 20 % wide', 'WARNING',
+     'The acceptance window must be properly ordered (upper > lower) and not unreasonably wide. A window wider than 20 % of the lower limit is treated as a loose-acceptance config drift.',
+     'UL=850, LL=847.2 — window 0.3 % wide, OK.',
+     'UL=847, LL=850 — inverted — emits "Bag-out limits inverted: upper=847, lower=850". Or UL=900, LL=700 — window 28.6 % — emits "Acceptance window too loose".',
+     'Catches both PLC misconfiguration (inverted UL/LL) and silent SOP drift where someone widened the window to reduce false rejects, hiding real issues.'),
     ('SLO-05', 'Day-silo and Buffer-silo at same index agree on noodle type', 'WARNING',
      'Day_silo_N and Buffer_silo_N (same index) are physically paired and must report the same noodle type.',
      'Day_silo_3 = "PLUMERIA"; Buffer_silo_3 = "PLUMERIA" — OK.',
      'Day_silo_3 = "PLUMERIA"; Buffer_silo_3 = "JASMINE" — emits "Day/Buffer silo 3 mismatch".',
      'A mismatch usually means leak-back between silos or residual product not flushed during change-over — the direct lead-in to a contaminated batch (see Insight #5).'),
-    ('SLO-06', 'Station barcode format (≥ 6 digits) when active', 'WARNING',
-     'When the station barcode is active, the value must be numeric and at least 6 digits long. Empty/short values are treated as idle.',
-     '"1300326026" — OK. "" — "Scanner idle / short value" (INFO).',
-     'Only truly broken active scans fail — non-numeric value while not idle.',
-     'Distinguishes idle scanners from malformed scans without flooding the alert log with false positives.'),
-    ('SLO-07', 'Warehouse barcode valid (weight > 0, count 1–6, noodle in set)', 'WARNING',
-     'Warehouse dosing barcode is CSV `batchId,weight,noodle,count`. Weight must be > 0; count must be 1–6; noodle must be in the valid set.',
-     '"B12345,250.5,JASMINE NOODLES,2" — OK.',
-     '"B12345,-10,JASMINE NOODLES,2" — emits "Invalid dosing barcode: weight=-10".',
-     'Warehouse barcodes flow directly into ERP inventory. Garbage in = wrong stock counts and unexplained variance during the next audit.'),
-    ('SLO-08', 'Silo streaming gap > 5 min (Shreeji exempt)', 'INFO',
-     'Silo-scoped streaming gap > 5 min during production hours. The Shreeji barcode is exempt because it polls legitimately sparsely.',
+    ('SLO-08', 'Silo streaming gap > 5 min', 'INFO',
+     'Silo-scoped streaming gap > 5 min during production hours. The Shreeji exemption is gone — Shreeji is now a BARCODE-zone tag with its own gap rule (BCD-05).',
      '2 min gap on Day_silo_1 — OK.',
      '8 min gap on Day_silo_3 at 14:00 — emits "Silo comms gap 8m12s".',
-     'Silo-scoped variant of GEN-01 / PSM-09, with the Shreeji exception that prevents false positives on the slow-polled warehouse scanner.'),
+     'Silo-scoped variant of GEN-01 / PSM-09.'),
     ('SLO-09', 'No silo should be the lone source of a unique noodle type', 'INFO',
      'When ≥ 6 silos are reporting, no single silo should be the sole source of a particular noodle type.',
      '3 silos report PLUMERIA, 3 silos report JASMINE — each type has multiple silos, OK.',
      '5 silos report PLUMERIA, only Day_silo_3 reports JASMINE — emits "Day_silo_3 shows unique noodle type \'JASMINE\' — review".',
      'A lone silo with a unique noodle is almost always mislabeled or carrying leftovers from the previous batch — the second strongest cross-contamination signal after SLO-05.'),
+]
+
+BCD_RULES = [
+    ('BCD-01', 'Station barcode format (≥ 6 digits) when active', 'WARNING',
+     'When the station scanner is active, the value must be numeric and at least 6 digits long. Empty / short values are treated as idle (INFO, not a failure).',
+     '"1300326026" — OK. "" — "Scanner idle / short value" (INFO).',
+     'Genuinely broken active scans — non-numeric while not idle — fail.',
+     'Distinguishes idle scanners from malformed scans without flooding the alert log with false positives.'),
+    ('BCD-02', 'Warehouse barcode valid (weight > 0, count 1–6, noodle in set)', 'WARNING',
+     'Warehouse dosing barcode is CSV `batchId,weight,noodleType,count`. Weight must be > 0; count must be 1–6; noodle must be in the valid set.',
+     '"B12345,250.5,JASMINE NOODLES,2" — OK.',
+     '"B12345,-10,JASMINE NOODLES,2" — emits "Invalid warehouse barcode: weight=-10".',
+     'Warehouse barcodes flow directly into ERP inventory. Garbage in = wrong stock counts and unexplained variance during the next audit.'),
+    ('BCD-03', 'Shreeji barcode valid (non-empty id, MODE = "PV", weight > 0)', 'WARNING',
+     'Shreeji barcode CSV is `barcodeId,MODE,weight`. The id must be non-empty, the MODE field must be the literal "PV" (its only documented value), and weight must be > 0.',
+     '"1300326026,PV,937.00" — OK.',
+     '",PV,937.00" — empty id — emits "Invalid Shreeji barcode: id missing".  Or "1300326026,SP,937" — emits "mode=\'SP\' (expected \'PV\')".',
+     'Shreeji scans feed traceability data to the customer-audit pack. A mode-field flip or weight glitch makes the row untrustworthy for that audit.'),
+    ('BCD-04', 'Sigma barcode (legacy) — empty/idle marker or pure numeric', 'CRITICAL',
+     'Legacy rule for the old Sigma SM_MX*_BC scanner tags. Value must be empty, the literal "Scan Barcode" (idle marker), or pure numeric digits.',
+     '"Scan Barcode" — OK (idle). "1300326026" — OK (valid scan).',
+     '"ABC123XYZ" — emits "Malformed Sigma barcode \'ABC123XYZ\'".',
+     'Retained for backwards-compatibility with older cascades that still emit the legacy barcode tag — new cascades emit BATCHCOUNTER + RECIPE_NAME instead.'),
+    ('BCD-05', 'Barcode streaming gap > 15 min', 'INFO',
+     'Barcode tags are by their nature event-driven and sparse — we tolerate up to 15 min between emissions during production hours before flagging.',
+     '5 min gap on a station scanner — OK (expected for low-throughput stations).',
+     '22 min gap on a station scanner at 14:00 — emits "Barcode comms gap 22m0s".',
+     'Wider tolerance than the Silo / Sigma streaming-gap rules because barcodes are physically scanned, not polled. Catches a truly dead scanner rather than an idle one.'),
 ]
 
 PKG_RULES = [
@@ -522,7 +540,7 @@ para(doc,
      'with a typed, rule-validated dashboard backed by a predictive ML layer.')
 para(doc, 'In its current state the system:')
 bullet(doc, 'Parses four zones of equipment (PSM dosing, Sigma mixers, day/buffer silos, packaging wrappers) from a unified schema.')
-bullet(doc, 'Applies 49 deterministic validation rules across those zones, classified by severity (CRITICAL / WARNING / INFO).')
+bullet(doc, 'Applies 51 deterministic validation rules across five zones (PSM, Sigma, Silo, Barcode, Packaging), classified by severity (CRITICAL / WARNING / INFO).')
 bullet(doc, 'Computes a per-batch health score (passing rows divided by rich-data rows) so operations leads can see at a glance which batches need scrutiny.')
 bullet(doc, 'Exposes a single sortable table of 4,500+ rows across 200+ batches with sticky filters for zone, status, date, raw material, recipe, plant, station, cascade, and wrapper.')
 bullet(doc, 'Ships an ONNX-backed prediction layer with five trained models (spike-within-5/10/15-minute windows, precursor risk, future error %, and a TFT attention model) that can be promoted to inline predictions next iteration.')
@@ -623,19 +641,44 @@ para(doc,
      'Liquid (both casings), Lauric, Noodle, PAS, Perfume, Powder, ST, STARCH.')
 
 h2(doc, '4.3 Silo')
+para(doc,
+     'The Silo zone covers the day-silo / buffer-silo noodle-type labels and '
+     'the bag-out detail tag at each dispensing station. Barcode-style tags '
+     '(station scanner, warehouse-dosing, Shreeji) have been split out into '
+     'the dedicated BARCODE zone (see §4.4) so traceability data lives in '
+     'one filterable surface.')
 table(doc,
       ['Sub-type', 'Tag substring', 'Payload'],
       [
           ['Noodle type', 'type_of_noodle', 'one of seven valid noodle types (or empty when idle)'],
-          ['Bag-out detail', 'All_Details', 'batchId,SP,PV,noodleType (single \',\' = idle)'],
-          ['Station barcode', 'Scnr_barcode', 'numeric (>=6 digits) when active'],
-          ['Warehouse barcode', 'Dosing_Barcode', 'batchId,weight,noodleType,count'],
-          ['Shreeji barcode', 'Shreeji', 'barcodeId,MODE,weight  (MODE typically literal "PV")'],
+          ['Bag-out detail', 'All_Details', 'batchId, upperLimit, lowerLimit, noodleType  (single \',\' = idle)'],
       ],
       col_widths=[1.6, 1.7, 3.1])
-para(doc, 'Day silos 1–6 and Buffer silos 1–5 surfaced separately. Station IDs: Stn_01, Stn_02.')
+para(doc,
+     'Day silos 1–6 and Buffer silos 1–5 surfaced separately. Station IDs: '
+     'Stn_01, Stn_02. The bag-out tag carries an acceptance window (upper / '
+     'lower kg limit) rather than an SP/PV pair — the actual bag weight is '
+     'sensed by a separate downstream scale, so dashboard rules check the '
+     'limits themselves are sane (positive, ordered, narrow enough) rather '
+     'than computing a deviation that has no measured value behind it.')
 
-h2(doc, '4.4 Packaging')
+h2(doc, '4.4 Barcode (virtual zone)')
+para(doc,
+     'BARCODE is a virtual zone — its rows are aggregated from tags scattered '
+     'across the Silo and Sigma workbooks. Surfacing them together gives a '
+     'single filter for every traceability scan on the line, irrespective of '
+     'which physical zone produced the scan.')
+table(doc,
+      ['Sub-type', 'Tag substring', 'Payload'],
+      [
+          ['Station', 'Scnr_barcode', 'numeric (≥ 6 digits) when active; "" or short = idle'],
+          ['Warehouse', 'Dosing_Barcode', 'batchId, weight, noodleType, count'],
+          ['Shreeji', 'Shreeji', 'barcodeId, MODE, weight (MODE typically literal "PV")'],
+          ['Sigma (legacy)', 'SM_MX*_BC / _BC', 'numeric barcode, or "Scan Barcode" when idle'],
+      ],
+      col_widths=[1.6, 1.7, 3.1])
+
+h2(doc, '4.5 Packaging')
 table(doc,
       ['Sub-type', 'Tag', 'Payload'],
       [
@@ -648,7 +691,7 @@ para(doc,
      '(WRA3, ACMA1, WRA16) have non-default machine IDs validated against '
      'WRAPPER_MACHINE_MAP.')
 
-h2(doc, '4.5 Valid Noodle Types')
+h2(doc, '4.6 Valid Noodle Types')
 para(doc,
      'JASMINE NOODLES, PLUMERIA NOODLES, SERGIO 56 NOODLES, TEXAS MOD NOODLES, '
      'GALAXY NOODLES, 20 PKO TULIP NOODLES, LILAC NOODLES.')
@@ -659,9 +702,10 @@ para(doc,
 page_break(doc)
 h1(doc, '5. Validation Rules Catalogue')
 para(doc,
-     'TagValidationService runs up to 49 rules per tag (37 distinct rule '
-     'bodies — SMX-01..12 reuse the PSM-01..12 logic with a relabelled prefix). '
-     'Every rule emits a '
+     'TagValidationService runs up to 51 rules per tag across five zones. '
+     'Twelve of the Sigma rules (SMX-01..12) re-use the PSM-01..12 logic with '
+     'a relabelled prefix, so the codebase has 39 distinct rule bodies. Every '
+     'rule emits a '
      'ValidationResult { ruleId, severity, passed, message }. The batch health '
      'score uses only the passed flag on rows where dataAvailable = true.')
 
@@ -746,17 +790,21 @@ for args in SMX_RULES:
     rule_card(*args)
 
 h2(doc, '5.4 Silo Rules')
+para(doc,
+     'The Silo bag-out tag now carries an acceptance window (upper / lower kg '
+     'limit) rather than an SP/PV pair, so SLO-03 / SLO-04 check the limits '
+     'themselves are sane. The two barcode rules that used to live here '
+     '(SLO-06 station, SLO-07 warehouse) have moved to the BARCODE zone — '
+     'see §5.6.')
 table(doc,
       ['ID', 'Severity', 'Description'],
       [
           ['SLO-01', 'CRITICAL', 'Noodle type must be in the valid set'],
           ['SLO-02', 'CRITICAL', 'Bag-out detail must be CSV of 4 fields, or single \',\' for idle'],
-          ['SLO-03', 'CRITICAL', 'Bag PV weight ≥ 0'],
-          ['SLO-04', 'WARNING', 'Bag PV within 10 % of SP'],
+          ['SLO-03', 'CRITICAL', 'Bag-out lower limit > 0'],
+          ['SLO-04', 'WARNING', 'Upper limit > lower limit, and acceptance window ≤ 20 % wide'],
           ['SLO-05', 'WARNING', 'Day-silo and Buffer-silo at same index agree on noodle type'],
-          ['SLO-06', 'WARNING', 'Station barcode format (≥ 6 digits) when active'],
-          ['SLO-07', 'WARNING', 'Warehouse barcode valid (weight > 0, count 1–6, noodle in set)'],
-          ['SLO-08', 'INFO', 'Silo streaming gap > 5 min (Shreeji exempt)'],
+          ['SLO-08', 'INFO', 'Silo streaming gap > 5 min'],
           ['SLO-09', 'INFO', 'No silo should be the lone source of a unique noodle type'],
       ],
       col_widths=[0.9, 1.0, 4.5],
@@ -765,7 +813,26 @@ h3(doc, 'Walkthrough — Silo Rules')
 for args in SLO_RULES:
     rule_card(*args)
 
-h2(doc, '5.5 Packaging Rules')
+h2(doc, '5.5 Barcode Rules')
+para(doc,
+     'BARCODE rules cover every traceability scan on the line — station '
+     'scanner, warehouse-dosing, Shreeji, and the legacy Sigma SM_MX*_BC tag.')
+table(doc,
+      ['ID', 'Severity', 'Description'],
+      [
+          ['BCD-01', 'WARNING', 'Station barcode format (≥ 6 digits) when active'],
+          ['BCD-02', 'WARNING', 'Warehouse barcode valid (weight > 0, count 1–6, noodle in set)'],
+          ['BCD-03', 'WARNING', 'Shreeji barcode valid (non-empty id, MODE = "PV", weight > 0)'],
+          ['BCD-04', 'CRITICAL', 'Sigma barcode (legacy) — empty/idle marker or pure numeric'],
+          ['BCD-05', 'INFO', 'Barcode streaming gap > 15 min'],
+      ],
+      col_widths=[0.9, 1.0, 4.5],
+      severity_col=1)
+h3(doc, 'Walkthrough — Barcode Rules')
+for args in BCD_RULES:
+    rule_card(*args)
+
+h2(doc, '5.6 Packaging Rules')
 table(doc,
       ['ID', 'Severity', 'Description'],
       [
@@ -783,7 +850,7 @@ h3(doc, 'Walkthrough — Packaging Rules')
 for args in PKG_RULES:
     rule_card(*args)
 
-h2(doc, '5.6 Status Buckets')
+h2(doc, '5.7 Status Buckets')
 table(doc,
       ['Bucket', 'Underlying statuses', 'Colour'],
       [

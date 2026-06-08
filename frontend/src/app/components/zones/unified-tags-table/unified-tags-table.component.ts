@@ -170,6 +170,7 @@ export class UnifiedTagsTableComponent {
       zone === 'PSM' ? c.CYAN :
       zone === 'SIGMA' ? '#a855f7' :
       zone === 'SILO' ? c.YELLOW :
+      zone === 'BARCODE' ? '#ec4899' :
       c.ORANGE;
     return {
       color: col,
@@ -225,13 +226,13 @@ export class UnifiedTagsTableComponent {
   // ---- zone filter helpers ----
   zoneSectionStyle(zone: ZoneType) {
     const c = this.C();
-    const col = zone === 'PSM' ? c.CYAN : zone === 'SIGMA' ? '#a855f7' : zone === 'SILO' ? c.YELLOW : c.ORANGE;
+    const col = zone === 'PSM' ? c.CYAN : zone === 'SIGMA' ? '#a855f7' : zone === 'SILO' ? c.YELLOW : zone === 'BARCODE' ? '#ec4899' : c.ORANGE;
     return { color: col };
   }
 
   zoneCardStyle(zone: ZoneType) {
     const c = this.C();
-    const col = zone === 'PSM' ? c.CYAN : zone === 'SIGMA' ? '#a855f7' : zone === 'SILO' ? c.YELLOW : c.ORANGE;
+    const col = zone === 'PSM' ? c.CYAN : zone === 'SIGMA' ? '#a855f7' : zone === 'SILO' ? c.YELLOW : zone === 'BARCODE' ? '#ec4899' : c.ORANGE;
     return {
       background: c.BG_BASE,
       border: `1px solid ${c.BORDER}`,

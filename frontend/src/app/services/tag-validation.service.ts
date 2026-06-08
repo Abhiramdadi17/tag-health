@@ -54,7 +54,8 @@ export class TagValidationService {
         break;
       }
       case 'SIGMA_BARCODE':
-        results.push(this.smx18_barcodeState(parsed.barcodeValue));
+        // Legacy Sigma barcode rows now flow through the BARCODE zone.
+        results.push(...this.runBarcodeRules(row, parsed, ts, state));
         break;
       case 'SIGMA_REWORK': {
         const consec = parsed.reworkValue > 0 ? state.consecutiveNonZeroReworkCount + 1 : 0;
@@ -233,10 +234,18 @@ export class TagValidationService {
         break;
       case 'bagout_detail':
         res.push(this.slo02_bagOutDetailsFormat(String(row.Value)));
-        if (!p.isIdle) { res.push(this.slo03_pvWeightNotNegative(p.PV)); res.push(this.slo04_pvWithinTolerance(p.SP, p.PV)); }
+        if (!p.isIdle) {
+          res.push(this.slo03_lowerLimitPositive(p.lowerLimit));
+          res.push(this.slo04_limitWindowSane(p.upperLimit, p.lowerLimit));
+        }
         break;
-      case 'barcode': res.push(this.slo06_barcodeFormat(p.barcodeValue)); break;
-      case 'warehouse_barcode': res.push(this.slo07_dosingBarcodeValid(String(row.Value))); break;
+      // Barcode sub-types are now routed through the BARCODE virtual zone.
+      // Their BCD-* rules are dispatched in runBarcodeRules() below.
+      case 'barcode':
+      case 'warehouse_barcode':
+      case 'shreeji_barcode':
+        res.push(...this.runBarcodeRules(row, p, ts, state));
+        break;
     }
     res.push(this.slo08_streamingGap(ts, state.lastTS, row.Tag));
     if (ctx.allSiloTypes) res.push(...this.slo09_recipeAlignment(ctx.allSiloTypes));
@@ -255,42 +264,102 @@ export class TagValidationService {
     if (parts.length !== 4) return fail('SLO-02', 'CRITICAL', `Expected 4 CSV fields, got ${parts.length}`);
     return ok('SLO-02', 'CRITICAL');
   }
-  slo03_pvWeightNotNegative(parsedPV: number): ValidationResult {
-    return parsedPV >= 0 ? ok('SLO-03', 'CRITICAL') : fail('SLO-03', 'CRITICAL', `Bag PV weight negative (${parsedPV})`);
+  slo03_lowerLimitPositive(lowerLimit: number): ValidationResult {
+    if (isNaN(lowerLimit)) return ok('SLO-03', 'CRITICAL');
+    return lowerLimit > 0
+      ? ok('SLO-03', 'CRITICAL')
+      : fail('SLO-03', 'CRITICAL', `Bag-out lower limit not positive (${lowerLimit})`);
   }
-  slo04_pvWithinTolerance(parsedSP: number, parsedPV: number): ValidationResult {
-    if (isNaN(parsedSP) || isNaN(parsedPV) || parsedSP <= 0) return ok('SLO-04', 'WARNING');
-    const dev = Math.abs(parsedPV - parsedSP) / parsedSP;
-    if (dev > 0.10) return fail('SLO-04', 'WARNING', `Bag PV ${parsedPV}kg outside 10% of SP ${parsedSP}kg (${(dev * 100).toFixed(1)}%)`);
-    if (dev > 0.05) return ok('SLO-04', 'WARNING', `Bag PV ${(dev * 100).toFixed(1)}% off SP`);
+  slo04_limitWindowSane(upperLimit: number, lowerLimit: number): ValidationResult {
+    if (isNaN(upperLimit) || isNaN(lowerLimit)) return ok('SLO-04', 'WARNING');
+    if (upperLimit <= lowerLimit) {
+      return fail('SLO-04', 'WARNING',
+        `Bag-out limits inverted: upper=${upperLimit}, lower=${lowerLimit}`);
+    }
+    if (lowerLimit <= 0) return ok('SLO-04', 'WARNING');
+    const window = (upperLimit - lowerLimit) / lowerLimit;
+    if (window > 0.20) {
+      return fail('SLO-04', 'WARNING',
+        `Acceptance window too loose: UL=${upperLimit}, LL=${lowerLimit} (${(window * 100).toFixed(1)}% wide)`);
+    }
     return ok('SLO-04', 'WARNING');
   }
   slo05_siloCrossConsistency(daySiloType: string, bufferSiloType: string, siloIndex: number): ValidationResult {
     if (!daySiloType || !bufferSiloType) return ok('SLO-05', 'WARNING');
     return daySiloType.trim() === bufferSiloType.trim() ? ok('SLO-05', 'WARNING') : fail('SLO-05', 'WARNING', `Day/Buffer silo ${siloIndex} mismatch (Day='${daySiloType}', Buffer='${bufferSiloType}')`);
   }
-  slo06_barcodeFormat(barcodeValue: string): ValidationResult {
-    const v = (barcodeValue ?? '').trim();
-    if (v === '') return fail('SLO-06', 'WARNING', 'Empty scanner barcode');
-    if (/^\d{6,}$/.test(v)) return ok('SLO-06', 'WARNING');
-    return ok('SLO-06', 'INFO', `Scanner idle / short value '${v}'`);
+  slo08_streamingGap(currentTS: Date | null, previousTS: Date | null, _tagName: string): ValidationResult {
+    const gap = this.gapSeconds(currentTS, previousTS);
+    if (gap == null) return ok('SLO-08', 'INFO');
+    if (gap > GAP_COMMS_DROP_S && this.inProductionHours(currentTS)) {
+      return fail('SLO-08', 'INFO', `Silo comms gap ${this.hms(gap)}`);
+    }
+    return ok('SLO-08', 'INFO');
   }
-  slo07_dosingBarcodeValid(raw: string): ValidationResult {
+
+  // ------------------------------------------------------------------------
+  // BARCODE zone rules — station / warehouse / Shreeji / legacy Sigma.
+  // ------------------------------------------------------------------------
+  private runBarcodeRules(row: RawTagRow, p: any, ts: Date | null, state: TagState): ValidationResult[] {
+    const res: ValidationResult[] = [];
+    if (p.kind === 'SILO' && p.tagType === 'barcode') {
+      res.push(this.bcd01_stationBarcodeFormat(p.barcodeValue));
+    } else if (p.kind === 'SILO' && p.tagType === 'warehouse_barcode') {
+      res.push(this.bcd02_warehouseBarcodeValid(String(row.Value)));
+    } else if (p.kind === 'SILO' && p.tagType === 'shreeji_barcode') {
+      res.push(this.bcd03_shreejiBarcodeValid(p.barcodeId, p.mode, p.weight));
+    } else if (p.kind === 'SIGMA_BARCODE') {
+      res.push(this.bcd04_sigmaBarcodeFormat(p.barcodeValue));
+    }
+    res.push(this.bcd05_barcodeStreamingGap(ts, state.lastTS));
+    return res;
+  }
+  bcd01_stationBarcodeFormat(barcodeValue: string): ValidationResult {
+    const v = (barcodeValue ?? '').trim();
+    if (v === '') return fail('BCD-01', 'WARNING', 'Empty station barcode');
+    if (/^\d{6,}$/.test(v)) return ok('BCD-01', 'WARNING');
+    return ok('BCD-01', 'INFO', `Scanner idle / short value '${v}'`);
+  }
+  bcd02_warehouseBarcodeValid(raw: string): ValidationResult {
     const parts = (raw ?? '').split(',');
-    if (parts.length !== 4) return fail('SLO-07', 'WARNING', `Dosing barcode needs 4 fields, got ${parts.length}`);
-    const weight = parseFloat(parts[1]); const count = parseInt(parts[3], 10); const noodle = (parts[2] ?? '').trim();
+    if (parts.length !== 4) {
+      return fail('BCD-02', 'WARNING', `Warehouse barcode needs 4 fields, got ${parts.length}`);
+    }
+    const weight = parseFloat(parts[1]);
+    const count = parseInt(parts[3], 10);
+    const noodle = (parts[2] ?? '').trim();
     const problems: string[] = [];
     if (!(weight > 0)) problems.push(`weight=${parts[1]}`);
     if (!(count >= 1 && count <= 6)) problems.push(`count=${parts[3]}`);
     if (!VALID_NOODLE_TYPES.includes(noodle)) problems.push(`noodle='${noodle}'`);
-    return problems.length ? fail('SLO-07', 'WARNING', `Invalid dosing barcode: ${problems.join(', ')}`) : ok('SLO-07', 'WARNING');
+    return problems.length
+      ? fail('BCD-02', 'WARNING', `Invalid warehouse barcode: ${problems.join(', ')}`)
+      : ok('BCD-02', 'WARNING');
   }
-  slo08_streamingGap(currentTS: Date | null, previousTS: Date | null, tagName: string): ValidationResult {
+  bcd03_shreejiBarcodeValid(barcodeId: string, mode: string, weight: number): ValidationResult {
+    const problems: string[] = [];
+    if (!barcodeId || barcodeId.trim() === '') problems.push('id missing');
+    if ((mode ?? '').trim().toUpperCase() !== 'PV') problems.push(`mode='${mode}' (expected 'PV')`);
+    if (!isFinite(weight) || weight <= 0) problems.push(`weight=${weight}`);
+    return problems.length
+      ? fail('BCD-03', 'WARNING', `Invalid Shreeji barcode: ${problems.join(', ')}`)
+      : ok('BCD-03', 'WARNING');
+  }
+  bcd04_sigmaBarcodeFormat(barcodeValue: string): ValidationResult {
+    const v = (barcodeValue ?? '').trim();
+    if (v === '') return fail('BCD-04', 'CRITICAL', 'Empty/null Sigma barcode');
+    if (v.toLowerCase() === 'scan barcode') return ok('BCD-04', 'CRITICAL', 'Idle (Scan Barcode)');
+    if (/^\d+$/.test(v)) return ok('BCD-04', 'CRITICAL', `Valid scan #${v}`);
+    return fail('BCD-04', 'CRITICAL', `Malformed Sigma barcode '${v}'`);
+  }
+  bcd05_barcodeStreamingGap(currentTS: Date | null, previousTS: Date | null): ValidationResult {
     const gap = this.gapSeconds(currentTS, previousTS);
-    if (gap == null) return ok('SLO-08', 'INFO');
-    if (tagName.includes('Shreeji')) return ok('SLO-08', 'INFO', 'Shreeji gap expected');
-    if (gap > GAP_COMMS_DROP_S && this.inProductionHours(currentTS)) return fail('SLO-08', 'INFO', `Silo comms gap ${this.hms(gap)}`);
-    return ok('SLO-08', 'INFO');
+    if (gap == null) return ok('BCD-05', 'INFO');
+    // Shreeji is sparse by design — flag only at the very long end (15 min).
+    if (gap > 900 && this.inProductionHours(currentTS)) {
+      return fail('BCD-05', 'INFO', `Barcode comms gap ${this.hms(gap)}`);
+    }
+    return ok('BCD-05', 'INFO');
   }
   slo09_recipeAlignment(allSiloTypes: Map<string, string>): ValidationResult[] {
     const present = Array.from(allSiloTypes.values()).filter(t => !!t);

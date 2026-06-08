@@ -14,6 +14,7 @@ const ZONE_OPTIONS: { key: ZoneType; label: string }[] = [
   { key: 'PSM', label: 'PSM' },
   { key: 'SIGMA', label: 'Sigma Mixers' },
   { key: 'SILO', label: 'Silos' },
+  { key: 'BARCODE', label: 'Barcodes' },
   { key: 'PACKAGING', label: 'Packaging' },
 ];
 
@@ -147,7 +148,7 @@ export class ZonesDashboardComponent implements OnInit {
   batchHealth = computed(() => ZoneAggregatorService.computeBatchHealth(this.filteredRows()));
 
   countsByZone = computed(() => {
-    const acc: Record<ZoneType, number> = { PSM: 0, SIGMA: 0, SILO: 0, PACKAGING: 0 };
+    const acc: Record<ZoneType, number> = { PSM: 0, SIGMA: 0, SILO: 0, BARCODE: 0, PACKAGING: 0 };
     for (const r of this.allRows()) acc[r.zone] += 1;
     return acc;
   });

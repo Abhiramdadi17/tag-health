@@ -213,7 +213,7 @@ export class TagParserService {
       };
     }
 
-    // Bag-out detail: 'batchId,SP,PV,noodleType' or ',' (idle)
+    // Bag-out detail: 'batchId,upperLimit,lowerLimit,noodleType' or ',' (idle)
     if (tagName.includes('All_Details')) {
       const stationId = tagName.includes('Stn_02') ? 'Stn_02' : 'Stn_01';
       const isIdle = (raw ?? '').trim() === ',';
@@ -223,8 +223,8 @@ export class TagParserService {
         tagType: 'bagout_detail',
         stationId,
         batchId: isIdle ? '' : (parts[0] ?? '').trim(),
-        SP: isIdle ? NaN : this.toNumber(parts[1]),
-        PV: isIdle ? NaN : this.toNumber(parts[2]),
+        upperLimit: isIdle ? NaN : this.toNumber(parts[1]),
+        lowerLimit: isIdle ? NaN : this.toNumber(parts[2]),
         noodleType: isIdle ? '' : (parts[3] ?? '').trim(),
         isIdle,
       };

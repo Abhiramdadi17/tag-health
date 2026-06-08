@@ -196,9 +196,13 @@ export class ZoneAggregatorService {
       base.status = this.sigmaStatusFromDev(p.S, base.dev);
       base.dataAvailable = base.sp != null && base.sp > 0;
     } else if (zone === 'SIGMA' && p.kind === 'SIGMA_BARCODE') {
-      base.subtype = 'BARCODE';
+      // Legacy Sigma barcodes route into the BARCODE virtual zone.
+      base.zone = 'BARCODE';
+      base.subtype = 'SIGMA';
+      base.machineId = p.mixer;
       base.status = p.isIdle ? 'IDLE' : 'SCANNED';
-      base.batchKey = `SIGMA:${p.mixer}:BC`;
+      base.batchId = p.barcodeValue;
+      base.batchKey = `BARCODE:SIGMA:${p.mixer}`;
       base.dataAvailable = !p.isIdle;
     } else if (zone === 'SIGMA' && p.kind === 'SIGMA_REWORK') {
       base.subtype = 'REWORK';
@@ -233,26 +237,38 @@ export class ZoneAggregatorService {
           base.dataAvailable = false;
         } else {
           base.batchId = p.batchId;
-          base.sp = p.SP; base.pv = p.PV;
-          base.dev = base.sp != null && base.sp > 0 ? ((base.pv - base.sp) / base.sp) * 100 : undefined;
+          // Silo bag-out carries acceptance limits, NOT SP/PV. Surface them
+          // explicitly; leave sp/pv/dev untouched so the table doesn't show
+          // a deviation column that has no measured value behind it.
+          base.upperLimit = isFinite(p.upperLimit) ? p.upperLimit : undefined;
+          base.lowerLimit = isFinite(p.lowerLimit) ? p.lowerLimit : undefined;
           base.rm = p.noodleType;
-          base.status = this.bagoutStatusFromDev(base.dev);
-          base.dataAvailable = base.sp != null && base.sp > 0 && base.pv != null;
+          base.latestValue = `UL=${this.fmtKg(p.upperLimit)} / LL=${this.fmtKg(p.lowerLimit)}`;
+          base.status = this.bagoutStatusFromLimits(p.upperLimit, p.lowerLimit);
+          base.dataAvailable = isFinite(p.upperLimit) && isFinite(p.lowerLimit);
         }
       } else if (p.tagType === 'barcode') {
+        // Station barcodes now live in the BARCODE zone.
+        base.zone = 'BARCODE';
+        base.subtype = 'STATION';
         base.status = p.isIdle ? 'IDLE' : 'SCANNED';
         base.batchId = p.barcodeValue;
-        base.batchKey = `SILO:${p.stationId}:BC`;
-        base.dataAvailable = false;
+        base.machineId = p.stationId;
+        base.batchKey = `BARCODE:STATION:${p.stationId}`;
+        base.dataAvailable = !p.isIdle;
       } else if (p.tagType === 'warehouse_barcode') {
+        base.zone = 'BARCODE';
+        base.subtype = 'WAREHOUSE';
         base.status = 'ACTIVE';
         base.batchId = p.batchId; base.rm = p.noodleType; base.pv = p.weight;
-        base.batchKey = `SILO:WAREHOUSE`;
+        base.batchKey = `BARCODE:WAREHOUSE`;
         base.dataAvailable = isFinite(p.weight) && p.weight > 0;
       } else if (p.tagType === 'shreeji_barcode') {
+        base.zone = 'BARCODE';
+        base.subtype = 'SHREEJI';
         base.status = 'ACTIVE';
         base.batchId = p.barcodeId; base.pv = p.weight;
-        base.batchKey = `SILO:SHREEJI`;
+        base.batchKey = `BARCODE:SHREEJI`;
         base.dataAvailable = isFinite(p.weight) && p.weight > 0;
       }
     } else if (zone === 'PSM' && p.kind === 'PSM_TELEMETRY') {
@@ -295,6 +311,20 @@ export class ZoneAggregatorService {
     return 'IDLE';
   }
 
+  private fmtKg(v: number): string {
+    return isFinite(v) ? v.toFixed(2) : '—';
+  }
+
+  private bagoutStatusFromLimits(upper: number, lower: number): HealthStatus {
+    if (!isFinite(upper) || !isFinite(lower)) return 'ACTIVE';
+    if (upper <= 0 || lower <= 0) return 'CRITICAL';
+    if (upper <= lower) return 'CRITICAL';
+    const window = (upper - lower) / lower;
+    if (window > 0.20) return 'WARNING';   // very loose acceptance window
+    return 'IN-SPEC';
+  }
+
+  // Kept for backwards-compat with any caller that still expects the legacy signature.
   private bagoutStatusFromDev(dev: number | undefined): HealthStatus {
     if (dev == null) return 'ACTIVE';
     const a = Math.abs(dev);
