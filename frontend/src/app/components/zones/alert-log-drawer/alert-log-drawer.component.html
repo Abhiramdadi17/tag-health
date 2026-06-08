@@ -1,0 +1,110 @@
+<!-- Backdrop -->
+<div *ngIf="open()"
+     class="fixed inset-0 z-40"
+     style="background: rgba(0,0,0,0.35); backdrop-filter: blur(2px);"
+     (click)="closed.emit()"></div>
+
+<!-- Slide-over panel -->
+<div *ngIf="open()"
+     class="fixed top-0 right-0 h-full z-50 flex flex-col animate-slide-in"
+     style="width: min(720px, 92vw);"
+     [ngStyle]="panelStyle()">
+
+  <!-- Header -->
+  <div class="px-4 py-3 border-b flex flex-col gap-2" [ngStyle]="headerStyle()">
+    <div class="flex items-center gap-3">
+      <h3 class="font-semibold text-base tracking-wider" [style.color]="C().CYAN">ALERT LOG</h3>
+      <p class="text-xs" [style.color]="C().MUTED">
+        {{ counts().total.toLocaleString() }} entries
+        · <span [style.color]="C().PINK">{{ counts().critical }} critical</span>
+        · <span [style.color]="C().YELLOW">{{ counts().warning }} warning</span>
+        · <span [style.color]="C().MUTED">{{ counts().info }} info</span>
+      </p>
+      <div class="flex-1"></div>
+      <button type="button"
+              class="text-xs font-bold"
+              [style.color]="C().MUTED"
+              [style.border]="'1px solid ' + C().BORDER"
+              style="background:transparent;padding:4px 12px;border-radius:6px;"
+              (click)="closed.emit()">✕ CLOSE</button>
+    </div>
+
+    <!-- Severity filter pills -->
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <button type="button" [ngStyle]="filterBtn(severity() === 'ALL', C().MUTED)"
+              (click)="severity.set('ALL')">ALL ({{ counts().total }})</button>
+      <button type="button" [ngStyle]="filterBtn(severity() === 'CRITICAL', C().PINK)"
+              (click)="severity.set('CRITICAL')">CRITICAL ({{ counts().critical }})</button>
+      <button type="button" [ngStyle]="filterBtn(severity() === 'WARNING', C().YELLOW)"
+              (click)="severity.set('WARNING')">WARNING ({{ counts().warning }})</button>
+      <button type="button" [ngStyle]="filterBtn(severity() === 'INFO', C().INDIGO)"
+              (click)="severity.set('INFO')">INFO ({{ counts().info }})</button>
+
+      <span class="mx-1 text-xs" [style.color]="C().BORDER">|</span>
+
+      <select [ngStyle]="selectStyle()"
+              [ngModel]="zoneFilter()"
+              (ngModelChange)="zoneFilter.set($event)">
+        <option value="ALL">All zones</option>
+        <option value="PSM">PSM</option>
+        <option value="SIGMA">Sigma</option>
+        <option value="SILO">Silo</option>
+        <option value="BARCODE">Barcode</option>
+        <option value="PACKAGING">Packaging</option>
+      </select>
+
+      <input type="text" placeholder="search rule / tag / message…"
+             [ngStyle]="searchStyle()"
+             [ngModel]="query()"
+             (ngModelChange)="query.set($event)" />
+    </div>
+  </div>
+
+  <!-- Scrollable list -->
+  <div class="flex-1 overflow-auto">
+    <div *ngIf="filtered().length === 0"
+         class="text-center py-16 text-sm"
+         [style.color]="C().MUTED">
+      No alerts match the active filter.
+    </div>
+
+    <div *ngFor="let group of groupedByTag()" class="border-b" [style.border-color]="C().BORDER">
+      <!-- Tag group header -->
+      <div class="px-4 py-2 flex items-center gap-3 cursor-pointer select-none"
+           [ngStyle]="tagHeaderStyle([])"
+           (click)="toggleTag(group.tag)">
+        <span class="text-xs" [style.color]="C().MUTED">
+          {{ expanded().has(group.tag) ? '▾' : '▸' }}
+        </span>
+        <span class="font-mono text-sm font-semibold flex-1 truncate" [style.color]="C().TEXT">
+          {{ group.tag }}
+        </span>
+        <ng-container *ngIf="tagCounts(group.rows) as tc">
+          <span *ngIf="tc.c > 0" [ngStyle]="severityChip('CRITICAL')">{{ tc.c }}C</span>
+          <span *ngIf="tc.w > 0" [ngStyle]="severityChip('WARNING')">{{ tc.w }}W</span>
+          <span *ngIf="tc.i > 0" [ngStyle]="severityChip('INFO')">{{ tc.i }}I</span>
+        </ng-container>
+        <span class="text-[10px] font-mono ml-2" [style.color]="C().MUTED">
+          {{ fmtTime(group.latest) }}
+        </span>
+      </div>
+
+      <!-- Per-tag entries -->
+      <div *ngIf="expanded().has(group.tag)">
+        <div *ngFor="let e of group.rows"
+             class="px-4 py-2 flex items-start gap-3 text-xs"
+             [ngStyle]="rowStyle()">
+          <span [ngStyle]="severityChip(e.severity)" class="flex-shrink-0">{{ e.severity[0] }}</span>
+          <span [ngStyle]="zoneChip(e.zone)" class="flex-shrink-0">{{ e.zone }}</span>
+          <span class="font-mono font-bold flex-shrink-0" [style.color]="severityColor(e.severity)">
+            {{ e.ruleId }}
+          </span>
+          <span class="flex-1" [style.color]="C().TEXT">{{ e.message }}</span>
+          <span class="font-mono text-[10px] whitespace-nowrap" [style.color]="C().MUTED">
+            {{ fmtTime(e.ts) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

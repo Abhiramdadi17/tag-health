@@ -41,6 +41,14 @@ const COLUMNS: ColumnSpec[] = [
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './unified-tags-table.component.html',
+  styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+  `],
 })
 export class UnifiedTagsTableComponent {
   private themeSvc = inject(ThemeService);
@@ -92,6 +100,12 @@ export class UnifiedTagsTableComponent {
   globalHealth   = input<number>(0);
   filterTextChange = output<string>();
   refresh          = output<void>();
+
+  // Alert log + CSV export hooks
+  alertCount       = input<number>(0);
+  criticalCount    = input<number>(0);
+  openAlertLog     = output<void>();
+  exportCsv        = output<void>();
 
   psmVisible     = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'PSM');
   sigmaVisible   = computed(() => this.selectedZone() === 'ALL' || this.selectedZone() === 'SIGMA');
@@ -188,7 +202,7 @@ export class UnifiedTagsTableComponent {
     };
   }
 
-  statusStyle(status: HealthStatus, bucket: StatusBucket) {
+  statusStyle(_status: HealthStatus, bucket: StatusBucket) {
     const c = this.C();
     let col = c.GREEN;
     if (bucket === 'CRITICAL') col = c.PINK;
@@ -312,6 +326,36 @@ export class UnifiedTagsTableComponent {
       color: c.CYAN,
       border: `1px solid color-mix(in srgb, ${c.CYAN} 40%, transparent)`,
       background: `color-mix(in srgb, ${c.CYAN} 7%, transparent)`,
+      padding: '6px 14px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+    };
+  }
+  alertBtnStyle() {
+    const c = this.C();
+    const hot = this.criticalCount() > 0;
+    const col = hot ? c.PINK : (this.alertCount() > 0 ? c.YELLOW : c.MUTED);
+    return {
+      color: col,
+      border: `1px solid color-mix(in srgb, ${col} 40%, transparent)`,
+      background: `color-mix(in srgb, ${col} 7%, transparent)`,
+      padding: '6px 14px',
+      borderRadius: '6px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+    };
+  }
+  exportBtnStyle() {
+    const c = this.C();
+    return {
+      color: c.GREEN,
+      border: `1px solid color-mix(in srgb, ${c.GREEN} 40%, transparent)`,
+      background: `color-mix(in srgb, ${c.GREEN} 7%, transparent)`,
       padding: '6px 14px',
       borderRadius: '6px',
       fontSize: '12px',

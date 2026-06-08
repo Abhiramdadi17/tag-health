@@ -2,8 +2,11 @@ import { Injectable, inject, signal } from '@angular/core';
 import { TagService } from './tag.service';
 import { ZoneTagsService, ZoneRecentRow } from './zone-tags.service';
 import { TagParserService } from './tag-parser.service';
+import { TagValidationService } from './tag-validation.service';
+import { AlertLogService } from './alert-log.service';
 import {
-  BatchHealth, HealthStatus, STATUS_TO_BUCKET, UnifiedTagRow, ZoneType,
+  BatchHealth, HealthStatus, PsmParsed, RawTagRow, STATUS_TO_BUCKET,
+  UnifiedTagRow, ZoneType,
 } from '../types/tags';
 import { TagRecord } from '../types';
 
@@ -24,6 +27,8 @@ export class ZoneAggregatorService {
   private psmSvc = inject(TagService);
   private zonesSvc = inject(ZoneTagsService);
   private parser = inject(TagParserService);
+  private validator = inject(TagValidationService);
+  private alertLog = inject(AlertLogService);
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -36,6 +41,7 @@ export class ZoneAggregatorService {
   async loadAll(force = false): Promise<UnifiedTagRow[]> {
     this.loading.set(true);
     this.error.set(null);
+    if (force) this.alertLog.clear();
     try {
       const [psm, psmTel, sigma, silo, pkg] = await Promise.all([
         this.loadPsm(force),
@@ -86,7 +92,11 @@ export class ZoneAggregatorService {
   private async loadPsm(force = false): Promise<UnifiedTagRow[]> {
     if (!force && this.rowsByZone.has('PSM')) return this.rowsByZone.get('PSM')!;
     const tags = await this.psmSvc.fetchTags();
-    const rows = tags.map(t => this.psmRowToUnified(t));
+    const rows = tags.map(t => {
+      const r = this.psmRowToUnified(t);
+      this.validatePsmAggregated(t, r);
+      return r;
+    });
     this.rowsByZone.set('PSM', rows);
     return rows;
   }
@@ -132,6 +142,31 @@ export class ZoneAggregatorService {
       tsUtc: this.parseTs(t.batch_start_ts),
       last10: t.last_10_readings?.length ? [...t.last_10_readings] : undefined,
     };
+  }
+
+  /** Synthesise a RawTagRow + PsmParsed for the pre-aggregated PSM stream so
+   *  it can run through the same rule engine the zone-telemetry rows use. */
+  private validatePsmAggregated(t: TagRecord, base: UnifiedTagRow): void {
+    const raw: RawTagRow = {
+      IotDeviceId: 'uaq-lakme-hul-iotedge-01',
+      SensorId:    'opcua',
+      SiteId:      'LLPL',
+      MachineId:   t.plant,
+      Tag:         t.synthetic_id,
+      Value: `D:,S:3,B:${t.batch_id ?? ''},R:${t.recipe ?? ''},RM:${t.raw_material ?? ''},SP:${t.current_sp ?? ''},PV:${t.current_pv ?? ''}`,
+      TS: t.batch_start_ts ?? '',
+    };
+    const parsed: PsmParsed = {
+      kind: 'PSM',
+      D: '',
+      S: 3,
+      B: Number(t.batch_id ?? 0),
+      R: t.recipe ?? '',
+      RM: t.raw_material ?? '',
+      SP: t.current_sp ?? NaN,
+      PV: t.current_pv ?? NaN,
+    };
+    this.runValidationFor(raw, parsed, base);
   }
 
   /** Derive a PSM tag-type subtype from the synthetic_id.
@@ -302,7 +337,45 @@ export class ZoneAggregatorService {
     base.bucket = STATUS_TO_BUCKET[base.status] ?? 'WARNING';
     // Health is only meaningful for rich rows: a 'noodle name' isn't graded.
     base.passing = base.dataAvailable && base.bucket === 'GOOD';
+
+    // Run the rule engine against this row and push any failures into the
+    // alert log. ZoneRecentRow is missing the device/site/sensor fields the
+    // validator's GEN-04 rule checks — populate them with the expected
+    // defaults so we don't trigger a false metadata failure.
+    const rawForValidator: RawTagRow = {
+      IotDeviceId: 'uaq-lakme-hul-iotedge-01',
+      SensorId:    'opcua',
+      SiteId:      'LLPL',
+      MachineId:   r.MachineId,
+      Tag:         r.Tag,
+      Value:       r.Value,
+      TS:          r.TS,
+    };
+    this.runValidationFor(rawForValidator, p, base);
+
     return base;
+  }
+
+  /** Invoke the rule engine and record failed rules to the alert log. */
+  private runValidationFor(
+    row: RawTagRow,
+    parsed: any,
+    base: UnifiedTagRow,
+  ): void {
+    try {
+      const results = this.validator.validateTag(row, parsed);
+      this.alertLog.record({
+        tagName: base.shortTag || base.tag,
+        zone: base.zone,
+        machineId: base.machineId,
+        batchId: base.batchId,
+        recipe: base.recipe,
+        tsUtc: base.tsUtc || Date.now(),
+        results,
+      });
+    } catch {
+      // Validator failures must not break ingest.
+    }
   }
 
   private sigmaStatusFromDev(s: number | undefined, dev: number | undefined): HealthStatus {

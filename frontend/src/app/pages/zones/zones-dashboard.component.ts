@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ThemeService } from '../../services/theme.service';
 import { ZoneAggregatorService } from '../../services/zone-aggregator.service';
+import { AlertLogService } from '../../services/alert-log.service';
 import { UnifiedTagsTableComponent, ZoneOption, StatusOption } from '../../components/zones/unified-tags-table/unified-tags-table.component';
 import { TagDetailDrawerComponent } from '../../components/zones/tag-detail-drawer/tag-detail-drawer.component';
+import { AlertLogDrawerComponent } from '../../components/zones/alert-log-drawer/alert-log-drawer.component';
 import {
   StatusBucket, UnifiedTagRow, ZoneType,
   ZoneFilters, EMPTY_ZONE_FILTERS, ZoneFilterEvent,
@@ -28,14 +30,18 @@ const STATUS_OPTIONS: { key: StatusBucket; label: string }[] = [
 @Component({
   selector: 'app-zones-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, UnifiedTagsTableComponent, TagDetailDrawerComponent],
+  imports: [CommonModule, FormsModule, UnifiedTagsTableComponent, TagDetailDrawerComponent, AlertLogDrawerComponent],
   templateUrl: './zones-dashboard.component.html',
 })
 export class ZonesDashboardComponent implements OnInit {
   private themeSvc = inject(ThemeService);
   private aggregator = inject(ZoneAggregatorService);
+  private alertLog = inject(AlertLogService);
 
   C = this.themeSvc.colors;
+
+  alertCounts = this.alertLog.counts;
+  alertLogOpen = signal<boolean>(false);
 
   readonly zoneOptions = ZONE_OPTIONS;
   readonly statusOptions = STATUS_OPTIONS;
@@ -476,5 +482,56 @@ export class ZonesDashboardComponent implements OnInit {
       'Noodle_Name':     'Noodle Name',
     };
     return map[v] ?? v;
+  }
+
+  // ─── CSV export of the currently filtered view ────────────────────────
+  exportCsv(): void {
+    const rows = this.filteredRows();
+    const bh = this.batchHealth();
+    const headers = [
+      'Zone', 'Tag', 'Machine', 'Batch', 'Recipe', 'RM / Noodle',
+      'Status', 'SP', 'PV', 'Dev %', 'Batch Health %', 'Latest Value', 'Timestamp',
+    ];
+
+    const esc = (v: unknown): string => {
+      if (v == null) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const fmt = (n: number | undefined, digits = 3): string =>
+      n == null || isNaN(n) ? '' : n.toFixed(digits);
+
+    const lines: string[] = [headers.join(',')];
+    for (const r of rows) {
+      const h = bh.get(r.batchKey);
+      lines.push([
+        esc(r.zone),
+        esc(r.shortTag),
+        esc(r.machineId),
+        esc(r.batchId ?? ''),
+        esc(r.recipe ?? ''),
+        esc(r.rm ?? ''),
+        esc(r.status),
+        fmt(r.sp, 3),
+        fmt(r.pv, 3),
+        r.dev == null ? '' : r.dev.toFixed(2),
+        h ? h.score.toFixed(0) : '',
+        esc(r.latestValue),
+        esc(r.ts),
+      ].join(','));
+    }
+
+    const csv = lines.join('\n');
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 13);
+    const filename = `tag-monitor-${stamp}.csv`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }

@@ -23,6 +23,20 @@
            [title]="rows().length + ' rows in view'">
         {{ globalHealth().toFixed(1) }}%
       </div>
+      <button type="button" [ngStyle]="alertBtnStyle()" (click)="openAlertLog.emit()"
+              [title]="alertCount() + ' total alerts'">
+        ALERTS
+        <span *ngIf="alertCount() > 0" class="ml-1 px-1.5 rounded font-bold"
+              [style.background]="criticalCount() > 0 ? C().PINK : C().YELLOW"
+              [style.color]="'#fff'"
+              style="font-size:10px;">
+          {{ alertCount() }}
+        </span>
+      </button>
+      <button type="button" [ngStyle]="exportBtnStyle()" (click)="exportCsv.emit()"
+              title="Export the currently filtered view to CSV">
+        EXPORT
+      </button>
       <button type="button" [ngStyle]="refreshBtnStyle()" (click)="refresh.emit()">REFRESH</button>
     </div>
 

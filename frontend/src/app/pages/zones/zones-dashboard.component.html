@@ -1,6 +1,7 @@
 <div class="flex flex-col h-full overflow-hidden" [style.background]="C().BG_BASE">
 
   <app-unified-tags-table
+    class="flex-1 min-h-0"
     [rows]="filteredRows()"
     [batchHealth]="batchHealth()"
     [zoneOptions]="zoneOptionsList()"
@@ -24,6 +25,8 @@
     [loading]="loading()"
     [error]="error()"
     [globalHealth]="globalHealthScore()"
+    [alertCount]="alertCounts().total"
+    [criticalCount]="alertCounts().critical"
     (zoneChange)="setZone($event)"
     (statusChange)="setStatus($event)"
     (dataAvailableChange)="onlyDataAvailable.set($event)"
@@ -36,6 +39,8 @@
     (resetFilters)="resetZoneFilters()"
     (filterTextChange)="filter.set($event)"
     (refresh)="refresh()"
+    (openAlertLog)="alertLogOpen.set(true)"
+    (exportCsv)="exportCsv()"
     (rowClick)="selectedRow.set($event)">
   </app-unified-tags-table>
 
@@ -48,3 +53,9 @@
   [batchHealth]="batchHealth()"
   (closed)="selectedRow.set(null)">
 </app-tag-detail-drawer>
+
+<!-- Alert log drawer -->
+<app-alert-log-drawer
+  [open]="alertLogOpen()"
+  (closed)="alertLogOpen.set(false)">
+</app-alert-log-drawer>
